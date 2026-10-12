@@ -35,6 +35,7 @@ export interface Group {
   lights: string[];
   state: GroupState;
   scenes?: Scene[];
+  grouped_light_id?: string;
 }
 
 export interface GroupState {
@@ -116,4 +117,9 @@ export interface SensorUpdateMessage {
   sensor: Sensor;
 }
 
-export type WSMessage = StatusMessage | SensorUpdateMessage;
+export interface GroupUpdateMessage {
+  type: 'group_update';
+  group: Group;
+}
+
+export type WSMessage = StatusMessage | SensorUpdateMessage | GroupUpdateMessage;

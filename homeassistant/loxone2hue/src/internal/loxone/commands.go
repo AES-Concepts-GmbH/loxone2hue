@@ -158,7 +158,28 @@ func (p *CommandParser) ToDeviceCommand(cmd *models.LoxoneCommand) models.Device
 	}
 
 	if bri, ok := cmd.FloatParam("brightness"); ok {
-		dc.Brightness = &bri
+		// Loxone dimmers drive a single analog output: 0 means off, anything
+		// above means on at that level. The HUE API does not infer either —
+		// a dimming write neither turns a lamp on nor accepts 0 — so derive
+		// the power state here unless the command set it explicitly.
+		switch {
+		case bri <= 0:
+			if dc.On == nil {
+				off := false
+				dc.On = &off
+			}
+			// No dimming write: 0 is rejected by the bridge and would be
+			// clamped to the minimum brightness instead of switching off.
+		default:
+			if bri > 100 {
+				bri = 100
+			}
+			dc.Brightness = &bri
+			if dc.On == nil {
+				on := true
+				dc.On = &on
+			}
+		}
 	}
 
 	if ct, ok := cmd.IntParam("color_temp"); ok {

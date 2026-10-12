@@ -26,6 +26,13 @@ export function useHueDevices() {
           s.id === message.sensor.id ? message.sensor : s
         )
       );
+    } else if (message.type === 'group_update') {
+      // Aggregated room/zone state from the bridge's grouped_light service.
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.id === message.group.id ? { ...g, state: message.group.state } : g
+        )
+      );
     }
   }, []);
 

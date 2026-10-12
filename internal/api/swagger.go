@@ -26,7 +26,7 @@ const openAPISpec = `{
   "info": {
     "title": "Loxone2HUE Gateway API",
     "description": "Gateway Service zur bidirektionalen Kommunikation zwischen Loxone und Philips HUE.",
-    "version": "1.3.1",
+    "version": "1.3.3",
     "contact": {
       "name": "Loxone2HUE Gateway"
     }

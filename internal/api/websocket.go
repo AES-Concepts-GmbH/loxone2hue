@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -32,6 +33,13 @@ type WebSocketHub struct {
 	register   chan *WebSocketClient
 	unregister chan *WebSocketClient
 	mu         sync.RWMutex
+
+	// feedback carries bridge events to the worker that talks to Loxone.
+	// Feedback does network I/O (HTTP with timeouts), so it must not run on
+	// the goroutine that drains the bridge's event channel.
+	feedback            chan hue.Event
+	droppedFeedback     atomic.Int64
+	lastFeedbackDropLog atomic.Int64
 
 	hueClient      *hue.Client
 	mappingManager *loxone.MappingManager
@@ -86,6 +94,7 @@ func NewWebSocketHub(hueClient *hue.Client, mappingManager *loxone.MappingManage
 		broadcast:      make(chan []byte, 256),
 		register:       make(chan *WebSocketClient),
 		unregister:     make(chan *WebSocketClient),
+		feedback:       make(chan hue.Event, feedbackQueueSize),
 		hueClient:      hueClient,
 		mappingManager: mappingManager,
 		commandParser:  loxone.NewCommandParser(),
@@ -96,8 +105,9 @@ func NewWebSocketHub(hueClient *hue.Client, mappingManager *loxone.MappingManage
 
 // Run starts the hub's event loop
 func (h *WebSocketHub) Run(ctx context.Context) {
-	// Forward HUE events to WebSocket clients
+	// Forward HUE events to WebSocket clients and queue them for Loxone
 	go h.forwardHueEvents(ctx)
+	go h.runFeedback(ctx)
 
 	for {
 		select {
@@ -148,44 +158,126 @@ func (h *WebSocketHub) Run(ctx context.Context) {
 	}
 }
 
-// forwardHueEvents forwards HUE events to connected clients
+// feedbackQueueSize bounds how many bridge events may wait for the feedback
+// worker. The bridge's own channel holds 100; this is deliberately larger so a
+// burst survives a slow Miniserver without pushing back on the event stream.
+const feedbackQueueSize = 256
+
+// feedbackDropLogInterval throttles the warning about a full feedback queue.
+const feedbackDropLogInterval = 10 * time.Second
+
+// forwardHueEvents forwards HUE events to connected clients and hands them to
+// the feedback worker. Everything here must be non-blocking: this goroutine
+// is the only consumer of the bridge's event channel, and the bridge drops
+// events once that channel fills.
 func (h *WebSocketHub) forwardHueEvents(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case event := <-h.hueClient.Events():
-			// Convert to status message
-			status := models.LoxoneStatus{
-				Type:   "status",
-				Device: event.ID,
-				State:  event.Data,
+			if data := h.uiMessageFor(event); data != nil {
+				h.broadcast <- data
 			}
+			h.queueFeedback(event)
+		}
+	}
+}
 
-			data, err := json.Marshal(status)
-			if err != nil {
-				continue
-			}
+// uiMessageFor builds the WebSocket message the Web UI receives for a bridge
+// event, or nil when the event has no UI representation.
+//
+// The payload is always the converted cache object, never the raw CLIP event:
+// the UI merges "status" into its LightState, and a raw {"on":{"on":false}}
+// used to leave light.state.on an always-truthy object.
+func (h *WebSocketHub) uiMessageFor(event hue.Event) []byte {
+	var msg interface{}
 
-			h.broadcast <- data
+	switch {
+	case event.Type == "light":
+		light, ok := h.hueClient.LightSnapshot(event.ID)
+		if !ok {
+			return nil
+		}
+		msg = models.LoxoneStatus{
+			Type:   "status",
+			Device: event.ID,
+			State:  light.State,
+		}
 
-			// For sensor events, also broadcast the full updated sensor object
-			if hue.IsSensorType(event.Type) {
-				if sensor := h.hueClient.GetSensor(event.ID); sensor != nil {
-					sensorMsg := map[string]interface{}{
-						"type":   "sensor_update",
-						"sensor": sensor,
-					}
-					if sData, err := json.Marshal(sensorMsg); err == nil {
-						h.broadcast <- sData
-					}
-				}
-			}
+	case event.Type == "grouped_light":
+		groupID := h.hueClient.GroupIDForGroupedLight(event.ID)
+		if groupID == "" {
+			return nil
+		}
+		group, ok := h.hueClient.GroupSnapshot(groupID)
+		if !ok {
+			return nil
+		}
+		msg = map[string]interface{}{
+			"type":  "group_update",
+			"group": group,
+		}
 
-			// Send feedback (UDP and/or HTTP) to Loxone Miniserver
+	case hue.IsSensorType(event.Type):
+		sensor := h.hueClient.GetSensor(event.ID)
+		if sensor == nil {
+			return nil
+		}
+		msg = map[string]interface{}{
+			"type":   "sensor_update",
+			"sensor": sensor,
+		}
+
+	default:
+		return nil
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return nil
+	}
+	return data
+}
+
+// queueFeedback hands an event to the feedback worker without blocking.
+func (h *WebSocketHub) queueFeedback(event hue.Event) {
+	select {
+	case h.feedback <- event:
+		return
+	default:
+	}
+
+	total := h.droppedFeedback.Add(1)
+	now := time.Now().UnixNano()
+	last := h.lastFeedbackDropLog.Load()
+	if now-last < int64(feedbackDropLogInterval) || !h.lastFeedbackDropLog.CompareAndSwap(last, now) {
+		return
+	}
+	log.Warn().
+		Str("id", event.ID).
+		Str("type", event.Type).
+		Int64("dropped_total", total).
+		Msg("Feedback queue full, Loxone will not receive this update (is the Miniserver reachable?)")
+}
+
+// runFeedback is the single worker that sends UDP and HTTP feedback to Loxone.
+// One worker keeps updates for a device in order (on before brightness).
+func (h *WebSocketHub) runFeedback(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case event := <-h.feedback:
 			h.sendFeedback(event)
 		}
 	}
+}
+
+// DroppedFeedback reports how many bridge events never reached the feedback
+// worker because its queue was full.
+func (h *WebSocketHub) DroppedFeedback() int64 {
+	return h.droppedFeedback.Load()
 }
 
 // feedbackTarget holds a loxoneID and optionally the miniserver to send to
@@ -272,35 +364,36 @@ func (h *WebSocketHub) sendFeedback(event hue.Event) {
 		return
 	}
 
-	// Collect all targets that should receive this update (skip scenes and mood mappings)
-	var targets []feedbackTarget
-
-	// Direct lookup: event.ID matches a mapping's hue_id (light or group).
-	// A HUE resource can carry several mappings, and each one is a target.
-	if direct := feedbackTargets(h.mappingManager.GetAllByHueID(event.ID)); len(direct) > 0 {
-		targets = append(targets, direct...)
-	} else if (udpEnabled && h.udpSender.HasSendAll()) || (httpEnabled && h.httpSender.HasSendAll()) {
-		// No mapping found — generate LoxoneID from device name, send to all send_all targets
-		if event.Type == "light" {
-			if light, err := h.hueClient.GetLight(event.ID); err == nil {
-				targets = append(targets, targetSendAll(sanitizeName(light.Name)))
-			}
-		} else if name := h.hueClient.GetGroupName(event.ID); name != "" {
-			targets = append(targets, targetSendAll(sanitizeName(name)))
+	// Resolve the event to the HUE resource that mappings refer to. Group
+	// mappings store the room or zone ID; the bridge reports the aggregated
+	// group state on the room's grouped_light service, so map that back.
+	// Single-light events deliberately do not fan out to the groups containing
+	// the light: that reported one lamp's state as the room's state.
+	hueID := event.ID
+	var name string
+	switch event.Type {
+	case "light":
+		if light, ok := h.hueClient.LightSnapshot(event.ID); ok {
+			name = light.Name
 		}
+	case "grouped_light":
+		hueID = h.hueClient.GroupIDForGroupedLight(event.ID)
+		if hueID == "" {
+			return
+		}
+		name = h.hueClient.GetGroupName(hueID)
+	default:
+		return
 	}
 
-	// For light events: also send to group mappings that contain this light
-	if event.Type == "light" {
-		for _, groupID := range h.hueClient.GetGroupIDsForLight(event.ID) {
-			if groupTargets := feedbackTargets(h.mappingManager.GetAllByHueID(groupID)); len(groupTargets) > 0 {
-				targets = append(targets, groupTargets...)
-			} else if (udpEnabled && h.udpSender.HasSendAll()) || (httpEnabled && h.httpSender.HasSendAll()) {
-				if name := h.hueClient.GetGroupName(groupID); name != "" {
-					targets = append(targets, targetSendAll(sanitizeName(name)))
-				}
-			}
-		}
+	// Collect all targets that should receive this update (skip scenes and mood mappings).
+	// A HUE resource can carry several mappings, and each one is a target.
+	var targets []feedbackTarget
+	if direct := feedbackTargets(h.mappingManager.GetAllByHueID(hueID)); len(direct) > 0 {
+		targets = append(targets, direct...)
+	} else if name != "" && ((udpEnabled && h.udpSender.HasSendAll()) || (httpEnabled && h.httpSender.HasSendAll())) {
+		// No mapping found — generate LoxoneID from device name, send to all send_all targets
+		targets = append(targets, targetSendAll(sanitizeName(name)))
 	}
 
 	if len(targets) == 0 {
@@ -646,10 +739,10 @@ func (h *WebSocketHub) handleHTTPCommand(w http.ResponseWriter, r *http.Request,
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":  "ok",
-		"target":  cmd.Target,
-		"action":  cmd.Action,
-		"hue_id":  hueID,
+		"status":   "ok",
+		"target":   cmd.Target,
+		"action":   cmd.Action,
+		"hue_id":   hueID,
 		"hue_type": hueType,
 	})
 }

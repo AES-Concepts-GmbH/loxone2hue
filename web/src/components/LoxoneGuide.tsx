@@ -485,7 +485,7 @@ export function LoxoneGuide() {
               </tr>
               <tr className="border-b border-gray-700/50">
                 <td className="py-3 pr-4 font-mono text-hue-orange">SET &lt;id&gt; BRI &lt;0-100&gt;</td>
-                <td className="py-3 pr-4">Helligkeit setzen (%)</td>
+                <td className="py-3 pr-4">Helligkeit setzen (%). 0 schaltet aus, jeder Wert über 0 schaltet ein</td>
                 <td className="py-3 font-mono text-xs">SET wz_decke BRI 75</td>
               </tr>
               <tr className="border-b border-gray-700/50">

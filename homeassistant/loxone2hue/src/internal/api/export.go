@@ -169,7 +169,7 @@ func (h *Handlers) ExportVirtualOutputs(w http.ResponseWriter, r *http.Request) 
 	type moodGroup struct {
 		BaseName  string
 		GroupName string // display name from the base group mapping
-		Count     int   // number of scene moods (excluding mood_0)
+		Count     int    // number of scene moods (excluding mood_0)
 	}
 	moodGroups := make(map[string]*moodGroup)
 	var directMappings []models.Mapping
@@ -253,8 +253,12 @@ func (h *Handlers) ExportVirtualOutputs(w http.ResponseWriter, r *http.Request) 
 	for _, m := range directMappings {
 		switch m.HueType {
 		case "light", "group":
+			// Analog dimmer: BRI 0 switches off, BRI > 0 switches on at that level.
 			fmt.Fprintf(&buf, "\t<VirtualOutCmd Title=\"%s (Br)\" Comment=\"%s\" CmdOnMethod=\"GET\" CmdOn=\"/ws?cmd=SET %s BRI &lt;v&gt;\" CmdOnHTTP=\"\" CmdOnPost=\"\" CmdOffMethod=\"GET\" CmdOff=\"\" CmdOffHTTP=\"\" CmdOffPost=\"\" CmdAnswer=\"\" HintText=\"\" Analog=\"true\" Repeat=\"0\" RepeatRate=\"0\"/>%s",
 				xmlAttr(m.Name), xmlAttr(m.Description), xmlAttr(m.LoxoneID), nl)
+			// Digital switch for plain on/off wiring without a dimmer.
+			fmt.Fprintf(&buf, "\t<VirtualOutCmd Title=\"%s (On/Off)\" Comment=\"%s\" CmdOnMethod=\"GET\" CmdOn=\"/ws?cmd=SET %s ON\" CmdOnHTTP=\"\" CmdOnPost=\"\" CmdOffMethod=\"GET\" CmdOff=\"/ws?cmd=SET %s OFF\" CmdOffHTTP=\"\" CmdOffPost=\"\" CmdAnswer=\"\" HintText=\"\" Analog=\"false\" Repeat=\"0\" RepeatRate=\"0\"/>%s",
+				xmlAttr(m.Name), xmlAttr(m.Description), xmlAttr(m.LoxoneID), xmlAttr(m.LoxoneID), nl)
 		}
 	}
 

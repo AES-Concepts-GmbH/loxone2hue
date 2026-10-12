@@ -154,3 +154,70 @@ func TestEventStreamBacksOffOnCleanClose(t *testing.T) {
 		t.Fatalf("reconnected %d times in 2s, expected backoff", got)
 	}
 }
+
+// TestGroupedLightEventUpdatesGroup covers room feedback: the bridge reports
+// the aggregated state of a room on its grouped_light service, and that event
+// has to land on the room in the cache. Previously grouped_light events were
+// ignored and the room's state was derived from whichever single lamp
+// changed last.
+func TestGroupedLightEventUpdatesGroup(t *testing.T) {
+	c := NewClient("", "")
+
+	room := convertHueRoom(hueRoom{
+		ID: "room-1",
+		Services: []struct {
+			RID   string `json:"rid"`
+			RType string `json:"rtype"`
+		}{{RID: "gl-1", RType: "grouped_light"}},
+	}, nil)
+	room.Name = "Wohnzimmer"
+	room.State.AnyOn = true
+	room.State.Brightness = 80
+
+	c.mu.Lock()
+	c.storeGroupLocked(room)
+	c.mu.Unlock()
+
+	if got := c.GroupIDForGroupedLight("gl-1"); got != "room-1" {
+		t.Fatalf("GroupIDForGroupedLight = %q, want room-1", got)
+	}
+
+	c.processEvent(`[{"creationtime":"2024-01-01T00:00:00Z","type":"update",` +
+		`"data":[{"id":"gl-1","type":"grouped_light","on":{"on":false},"dimming":{"brightness":10}}]}]`)
+
+	snap, ok := c.GroupSnapshot("room-1")
+	if !ok {
+		t.Fatal("room missing from cache")
+	}
+	if snap.State.AnyOn {
+		t.Error("any_on still true after grouped_light off event")
+	}
+	if snap.State.Brightness != 10 {
+		t.Errorf("brightness = %v, want 10", snap.State.Brightness)
+	}
+
+	select {
+	case ev := <-c.Events():
+		if ev.Type != "grouped_light" || ev.ID != "gl-1" {
+			t.Errorf("event = %s/%s, want grouped_light/gl-1", ev.Type, ev.ID)
+		}
+	default:
+		t.Error("grouped_light event was not forwarded")
+	}
+}
+
+// TestDroppedEventsAreCounted pins the previously silent "channel full, skip"
+// path: lost events are now visible through the counter and the health
+// endpoint.
+func TestDroppedEventsAreCounted(t *testing.T) {
+	c := NewClient("", "")
+
+	// Nobody reads Events(), so everything beyond the buffer is dropped.
+	for i := 0; i < cap(c.eventChan)+5; i++ {
+		c.processEvent(testEventPayload)
+	}
+
+	if got := c.DroppedEvents(); got != 5 {
+		t.Errorf("DroppedEvents = %d, want 5", got)
+	}
+}

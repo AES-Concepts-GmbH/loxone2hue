@@ -38,6 +38,7 @@ func NewServer(hueClient *hue.Client, mappingManager *loxone.MappingManager, udp
 
 	s.wsHub = NewWebSocketHub(hueClient, mappingManager, udpSender, httpSender)
 	s.handlers = NewHandlers(hueClient, mappingManager, udpSender, httpSender)
+	s.handlers.feedbackDropped = s.wsHub.DroppedFeedback
 
 	s.setupRoutes()
 	return s

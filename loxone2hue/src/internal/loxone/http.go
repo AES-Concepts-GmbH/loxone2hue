@@ -20,7 +20,15 @@ type httpTarget struct {
 	password string
 	sendAll  bool
 	name     string
+	// downUntil is set after a failed request. Until it passes, further
+	// updates to this target are skipped instead of each waiting for the
+	// timeout, so one unreachable Miniserver cannot stall the feedback queue.
+	// Guarded by HTTPSender.mu.
+	downUntil time.Time
 }
+
+// httpBackoff is how long a target is skipped after a failed request.
+const httpBackoff = 10 * time.Second
 
 // HTTPSender sends status updates to one or more Loxone Miniservers via HTTP
 type HTTPSender struct {
@@ -34,7 +42,9 @@ func NewHTTPSender() *HTTPSender {
 	return &HTTPSender{
 		targets: make(map[string]*httpTarget),
 		client: &http.Client{
-			Timeout: 5 * time.Second,
+			// Feedback is fire-and-forget; a Miniserver that does not answer
+			// within this window is treated as unreachable (see sendHTTP).
+			Timeout: 2 * time.Second,
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
@@ -137,6 +147,14 @@ func (s *HTTPSender) SendToAll(loxoneID, property string, value interface{}) {
 // Format: GET /dev/sps/io/<loxone_id>_<property>/<value>
 func (s *HTTPSender) sendHTTP(t *httpTarget, loxoneID, property string, value interface{}) {
 	viName := fmt.Sprintf("%s_%s", loxoneID, property)
+
+	s.mu.Lock()
+	skip := time.Now().Before(t.downUntil)
+	s.mu.Unlock()
+	if skip {
+		log.Debug().Str("miniserver", t.name).Str("vi", viName).Msg("HTTP feedback skipped, miniserver marked unreachable")
+		return
+	}
 	base := strings.TrimRight(t.baseURL, "/")
 	// Escape the value as well: sensor payloads such as a contact state are
 	// free-form strings and a "/" would otherwise change the request path.
@@ -155,7 +173,11 @@ func (s *HTTPSender) sendHTTP(t *httpTarget, loxoneID, property string, value in
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		log.Warn().Err(err).Str("miniserver", t.name).Str("url", reqURL).Msg("Failed to send HTTP feedback")
+		s.mu.Lock()
+		t.downUntil = time.Now().Add(httpBackoff)
+		s.mu.Unlock()
+		log.Warn().Err(err).Str("miniserver", t.name).Str("url", reqURL).
+			Dur("backoff", httpBackoff).Msg("Failed to send HTTP feedback, pausing this miniserver")
 		return
 	}
 	resp.Body.Close()
