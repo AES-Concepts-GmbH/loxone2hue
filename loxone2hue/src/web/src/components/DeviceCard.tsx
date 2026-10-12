@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Lightbulb, Power, Radio } from 'lucide-react';
 import { Light } from '../types';
 import type { Mapping } from '../services/api';
@@ -16,6 +16,13 @@ interface DeviceCardProps {
 export function DeviceCard({ device, onToggle, onBrightness, mapping, udpSendAll = false }: DeviceCardProps) {
   const [localBrightness, setLocalBrightness] = useState(device.state.brightness);
   const [showUdp, setShowUdp] = useState(false);
+
+  // The slider holds its own value while dragging, but has to follow changes
+  // made elsewhere (Hue app, Loxone, auto-refresh). Without this it kept the
+  // value from mount and the next commit sent that stale value back.
+  useEffect(() => {
+    setLocalBrightness(device.state.brightness);
+  }, [device.state.brightness]);
 
   const handleBrightnessChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value);

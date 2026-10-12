@@ -111,12 +111,14 @@ export function useHueDevices() {
 
         await api.setGroup(id, { on, brightness });
 
-        // Refresh data after a short delay to get actual state
-        setTimeout(() => fetchData(), 1000);
+        // Refresh data after a short delay to get actual state. Without
+        // `false` the loading spinner replaced the lists and every card lost
+        // its local state (open UDP section, slider position).
+        setTimeout(() => fetchData(false), 1000);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to update group');
         // Revert on error
-        fetchData();
+        fetchData(false);
       }
     },
     [fetchData]

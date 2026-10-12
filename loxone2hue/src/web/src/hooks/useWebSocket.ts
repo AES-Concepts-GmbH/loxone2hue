@@ -40,6 +40,12 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     };
 
     ws.onclose = () => {
+      // Under StrictMode (and on any fast remount) the first socket's close
+      // arrives after a second one is already open. That stale close must
+      // neither flip isConnected nor start a reconnect, or two sockets end
+      // up delivering every message twice.
+      if (wsRef.current !== ws) return;
+
       console.log('WebSocket disconnected');
       setIsConnected(false);
 

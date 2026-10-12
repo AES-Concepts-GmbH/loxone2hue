@@ -151,7 +151,7 @@ func (h *Handlers) CreateBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg := config.Get()
+	cfg := config.Snapshot()
 	backup := ConfigBackup{
 		ID:        uuid.New().String(),
 		Version:   config.GetVersion(),

@@ -10,9 +10,11 @@ interface MappingConfigProps {
   scenes: Scene[];
   sensors?: Sensor[];
   onNavigateToHueElement?: (hueId: string, hueType: string) => void;
+  /** Called after mappings were created, changed or deleted here. */
+  onMappingsChanged?: () => void;
 }
 
-export function MappingConfig({ lights, groups, scenes, sensors = [], onNavigateToHueElement }: MappingConfigProps) {
+export function MappingConfig({ lights, groups, scenes, sensors = [], onNavigateToHueElement, onMappingsChanged }: MappingConfigProps) {
   const [mappings, setMappings] = useState<Mapping[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -160,6 +162,9 @@ export function MappingConfig({ lights, groups, scenes, sensors = [], onNavigate
     }
   };
 
+  // Tell the Dashboard the mappings changed so the other tabs refresh theirs.
+  const notifyChanged = () => onMappingsChanged?.();
+
   const handleAdd = async () => {
     if (!formData.name || !formData.loxone_id || !formData.hue_id || isSubmitting) return;
 
@@ -222,6 +227,7 @@ export function MappingConfig({ lights, groups, scenes, sensors = [], onNavigate
       }
 
       setMappings(newMappings);
+      notifyChanged();
       closeWizard();
     } catch (error) {
       console.error('Failed to create mapping:', error);
@@ -234,6 +240,7 @@ export function MappingConfig({ lights, groups, scenes, sensors = [], onNavigate
     try {
       const updated = await api.updateMapping(id, formData);
       setMappings(mappings.map((m) => (m.id === id ? updated : m)));
+      notifyChanged();
       setEditingId(null);
       setFormData({});
     } catch (error) {
@@ -247,6 +254,7 @@ export function MappingConfig({ lights, groups, scenes, sensors = [], onNavigate
     try {
       await api.deleteMapping(id);
       setMappings(mappings.filter((m) => m.id !== id));
+      notifyChanged();
     } catch (error) {
       console.error('Failed to delete mapping:', error);
     }
@@ -268,6 +276,7 @@ export function MappingConfig({ lights, groups, scenes, sensors = [], onNavigate
       await api.deleteMapping(parentMapping.id);
       const deletedIds = new Set([parentMapping.id, ...children.map((c) => c.id)]);
       setMappings(mappings.filter((m) => !deletedIds.has(m.id)));
+      notifyChanged();
     } catch (error) {
       console.error('Failed to delete mapping group:', error);
     }
@@ -294,6 +303,7 @@ export function MappingConfig({ lights, groups, scenes, sensors = [], onNavigate
         description: `Mood ${numA} für ${parentName}`,
       });
       await loadMappings();
+      notifyChanged();
     } catch (err) {
       console.error('Failed to swap mood order:', err);
     }
@@ -331,6 +341,7 @@ export function MappingConfig({ lights, groups, scenes, sensors = [], onNavigate
       }
 
       await loadMappings();
+      notifyChanged();
     } catch (err) {
       console.error('Failed to delete mood scene:', err);
     }
@@ -363,6 +374,7 @@ export function MappingConfig({ lights, groups, scenes, sensors = [], onNavigate
       });
       setAddingMoodToParent(null);
       await loadMappings();
+      notifyChanged();
     } catch (err) {
       console.error('Failed to add mood scene:', err);
     }
@@ -440,6 +452,7 @@ export function MappingConfig({ lights, groups, scenes, sensors = [], onNavigate
       setImportResult(result);
       // Reload mappings after import
       await loadMappings();
+      notifyChanged();
     } catch (error) {
       console.error('Failed to import mappings:', error);
       setImportError('Import fehlgeschlagen. Bitte überprüfe die Backup-Datei.');

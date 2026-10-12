@@ -235,7 +235,7 @@ func (h *Handlers) PairBridge(w http.ResponseWriter, r *http.Request) {
 	// Save configuration. The pairing itself succeeded, but a key that is not
 	// on disk is lost at the next restart, so treat that as a failure and
 	// leave the previously configured bridge in place.
-	prevHue := config.Get().Hue
+	prevHue := config.GetHue()
 	config.UpdateHue(req.BridgeIP, appKey)
 	if !saveConfig(w, "pairing", func() { config.UpdateHue(prevHue.BridgeIP, prevHue.ApplicationKey) }) {
 		return
@@ -434,9 +434,8 @@ func (h *Handlers) CreateMapping(w http.ResponseWriter, r *http.Request) {
 
 	// Auto-assign miniserver if only one is configured and none was provided
 	if mapping.MiniserverID == "" {
-		cfg := config.Get()
-		if len(cfg.Loxone.Miniservers) == 1 {
-			mapping.MiniserverID = cfg.Loxone.Miniservers[0].ID
+		if miniservers := config.GetLoxone().Miniservers; len(miniservers) == 1 {
+			mapping.MiniserverID = miniservers[0].ID
 		}
 	}
 
@@ -537,12 +536,11 @@ const maskedPasswordSentinel = config.MaskedPassword
 
 // GetConfig returns the current configuration
 func (h *Handlers) GetConfig(w http.ResponseWriter, r *http.Request) {
-	cfg := config.Get()
+	cfg := config.Snapshot()
 
-	// Mask Loxone HTTP passwords so they are never sent to clients in clear text.
+	// Mask Loxone HTTP passwords so they are never sent to clients in clear
+	// text. The snapshot is already a copy, so masking in place is safe.
 	safeLoxone := cfg.Loxone
-	safeLoxone.Miniservers = make([]config.MiniserverConfig, len(cfg.Loxone.Miniservers))
-	copy(safeLoxone.Miniservers, cfg.Loxone.Miniservers)
 	for i := range safeLoxone.Miniservers {
 		if safeLoxone.Miniservers[i].HTTPPassword != "" {
 			safeLoxone.Miniservers[i].HTTPPassword = maskedPasswordSentinel

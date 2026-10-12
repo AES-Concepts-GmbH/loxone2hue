@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useHueDevices } from '../hooks/useHueDevices';
 import { DeviceList } from './DeviceList';
 import { GroupList } from './GroupList';
@@ -61,6 +61,18 @@ export function Dashboard() {
     activateScene,
   } = useHueDevices();
 
+  // Mappings feed the UDP buttons and link icons of the device, room and
+  // sensor tabs. MappingConfig calls this after every change so those tabs
+  // do not show the state from page load.
+  const loadMappings = useCallback(async () => {
+    try {
+      const result = await api.getMappings();
+      setMappings(result.mappings || []);
+    } catch (err) {
+      console.error('Failed to fetch mappings:', err);
+    }
+  }, []);
+
   // Fetch bridge IP and mappings on mount
   useEffect(() => {
     const fetchBridgeInfo = async () => {
@@ -74,14 +86,13 @@ export function Dashboard() {
             (ms) => ms.udp_enabled && ms.send_all
           )
         );
-        const result = await api.getMappings();
-        setMappings(result.mappings || []);
       } catch (err) {
         console.error('Failed to fetch bridge info:', err);
       }
     };
     fetchBridgeInfo();
-  }, []);
+    loadMappings();
+  }, [loadMappings]);
 
   // Auto-refresh
   useEffect(() => {
@@ -388,6 +399,7 @@ export function Dashboard() {
             scenes={scenes}
             sensors={sensors}
             onNavigateToHueElement={navigateToHueElement}
+            onMappingsChanged={loadMappings}
           />
         )}
 

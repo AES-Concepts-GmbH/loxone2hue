@@ -298,11 +298,37 @@ func Load(path string) (*Config, error) {
 	return cfg, nil
 }
 
-// Get returns the current configuration
-func Get() *Config {
+// Snapshot returns a deep copy of the current configuration.
+//
+// There is deliberately no accessor that hands out the live *Config: callers
+// used to read it without the lock while UpdateMappings, UpdateLoxone and
+// RestoreFromBackup wrote under it, which is a data race. The copy costs a few
+// allocations per API call and makes every read self-contained.
+func Snapshot() Config {
 	mu.RLock()
 	defer mu.RUnlock()
-	return cfg
+
+	snap := *cfg
+	snap.Loxone.Miniservers = append([]MiniserverConfig(nil), cfg.Loxone.Miniservers...)
+	if snap.Loxone.Miniservers == nil {
+		snap.Loxone.Miniservers = []MiniserverConfig{}
+	}
+	snap.Mappings = append([]models.Mapping(nil), cfg.Mappings...)
+	return snap
+}
+
+// GetServer returns a copy of the HTTP server settings.
+func GetServer() ServerConfig {
+	mu.RLock()
+	defer mu.RUnlock()
+	return cfg.Server
+}
+
+// GetHue returns a copy of the HUE bridge settings, including the key.
+func GetHue() HueConfig {
+	mu.RLock()
+	defer mu.RUnlock()
+	return cfg.Hue
 }
 
 // Save writes the current configuration to the file.
