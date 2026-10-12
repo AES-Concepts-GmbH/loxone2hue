@@ -1,5 +1,6 @@
 import { Sensor } from '../types';
 import type { Mapping } from '../services/api';
+import { sensorKind, sensorTypeLabels, sensorScopeLabels, sensorLux } from '../utils/sensors';
 import {
   Activity,
   Thermometer,
@@ -21,17 +22,7 @@ interface SensorListProps {
   udpSendAll?: boolean;
 }
 
-const sensorTypeLabels: Record<string, string> = {
-  motion: 'Bewegung',
-  temperature: 'Temperatur',
-  light_level: 'Helligkeit',
-  button: 'Taster',
-  contact: 'Kontakt',
-  relative_rotary: 'Drehregler',
-  device_power: 'Batterie',
-};
-
-const sensorTypeIcons: Record<string, typeof Activity> = {
+const sensorKindIcons: Record<string, typeof Activity> = {
   motion: Activity,
   temperature: Thermometer,
   light_level: Sun,
@@ -40,6 +31,10 @@ const sensorTypeIcons: Record<string, typeof Activity> = {
   relative_rotary: RotateCw,
   device_power: Battery,
 };
+
+function sensorIcon(sensor: Sensor): typeof Activity {
+  return sensorKindIcons[sensorKind(sensor.type) ?? ''] || Activity;
+}
 
 function formatDateTime(isoString: string | undefined): string | null {
   if (!isoString) return null;
@@ -53,16 +48,14 @@ function formatDateTime(isoString: string | undefined): string | null {
 
 function formatSensorValue(sensor: Sensor): string {
   const s = sensor.state;
-  switch (sensor.type) {
+  switch (sensorKind(sensor.type)) {
     case 'motion':
       return s.motion ? 'Bewegung erkannt' : 'Keine Bewegung';
     case 'temperature':
       return s.temperature != null ? `${s.temperature.toFixed(1)} \u00B0C` : '--';
     case 'light_level': {
-      if (s.light_level == null) return '--';
-      // HUE light level is in 10000 * log10(lux) + 1
-      const lux = Math.pow(10, (s.light_level - 1) / 10000);
-      return `${Math.round(lux)} Lux`;
+      const lux = sensorLux(sensor);
+      return lux == null ? '--' : `${lux} Lux`;
     }
     case 'button':
       return s.button_event || '--';
@@ -81,7 +74,7 @@ function formatSensorValue(sensor: Sensor): string {
 }
 
 function SensorStateIndicator({ sensor }: { sensor: Sensor }) {
-  switch (sensor.type) {
+  switch (sensorKind(sensor.type)) {
     case 'motion':
       return (
         <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -195,8 +188,9 @@ export function SensorList({ sensors, loading, mappings = [], udpSendAll = false
           </div>
           <div className="divide-y divide-gray-700/50">
             {deviceSensors.map((sensor) => {
-              const Icon = sensorTypeIcons[sensor.type] || Activity;
+              const Icon = sensorIcon(sensor);
               const mapped = hasMappingOrSendAll(sensor.id);
+              const scopeLabel = sensor.scope ? sensorScopeLabels[sensor.scope] : undefined;
               return (
                 <div key={sensor.id} className="px-4 py-3 flex items-center gap-3">
                   <div className={`p-2 rounded-lg ${sensor.state.enabled ? 'bg-hue-orange/10 text-hue-orange' : 'bg-gray-700 text-gray-500'}`}>
@@ -207,6 +201,11 @@ export function SensorList({ sensors, loading, mappings = [], udpSendAll = false
                       <span className="text-white text-sm font-medium truncate">
                         {sensorTypeLabels[sensor.type] || sensor.type}
                       </span>
+                      {scopeLabel && (
+                        <span className="text-xs bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded" title="Von der Bridge aggregiert">
+                          {scopeLabel}
+                        </span>
+                      )}
                       {mapped && (
                         <span title="Mapping vorhanden"><Link2 size={12} className="text-hue-orange flex-shrink-0" /></span>
                       )}
@@ -234,7 +233,7 @@ export function SensorList({ sensors, loading, mappings = [], udpSendAll = false
           </div>
           <div className="divide-y divide-gray-700/50">
             {noDevice.map((sensor) => {
-              const Icon = sensorTypeIcons[sensor.type] || Activity;
+              const Icon = sensorIcon(sensor);
               return (
                 <div key={sensor.id} className="px-4 py-3 flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-gray-700 text-gray-400">

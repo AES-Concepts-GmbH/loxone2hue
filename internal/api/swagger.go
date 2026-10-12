@@ -610,7 +610,7 @@ const openAPISpec = `{
       "get": {
         "tags": ["Sensors"],
         "summary": "Alle Sensoren abrufen",
-        "description": "Gibt eine Liste aller HUE Sensoren zurück, gruppiert nach Gerät. Unterstützte Sensortypen: motion (Bewegung), temperature (Temperatur), light_level (Helligkeit), button (Taster), contact (Kontakt), relative_rotary (Drehregler), device_power (Batterie).",
+        "description": "Gibt eine Liste aller HUE Sensoren zurück, gruppiert nach Gerät bzw. Raum. Unterstützte Sensortypen: motion (Bewegung), temperature (Temperatur), light_level (Helligkeit), button (Taster), contact (Kontakt), relative_rotary (Drehregler), device_power (Batterie) sowie die von der Bridge pro Raum/Zuhause aggregierten grouped_motion und grouped_light_level.",
         "responses": {
           "200": {
             "description": "Liste der Sensoren",
@@ -1563,8 +1563,13 @@ const openAPISpec = `{
           },
           "type": {
             "type": "string",
-            "enum": ["motion", "temperature", "light_level", "button", "contact", "relative_rotary", "device_power"],
-            "description": "Sensortyp"
+            "enum": ["motion", "temperature", "light_level", "button", "contact", "relative_rotary", "device_power", "grouped_motion", "grouped_light_level"],
+            "description": "Sensortyp (CLIP v2 Ressourcentyp)"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["device", "room", "home"],
+            "description": "Worauf sich der Sensor bezieht: physisches Gerät, von der Bridge pro Raum oder für das ganze Zuhause aggregiert"
           },
           "device_id": {
             "type": "string",
@@ -1595,7 +1600,12 @@ const openAPISpec = `{
           },
           "light_level": {
             "type": "integer",
-            "description": "Helligkeit in Lux (light_level sensor)",
+            "description": "Helligkeit als Rohwert der Bridge: 10000 * log10(Lux) + 1 (light_level, grouped_light_level)",
+            "nullable": true
+          },
+          "lux": {
+            "type": "integer",
+            "description": "Helligkeit in Lux, aus light_level umgerechnet",
             "nullable": true
           },
           "button_event": {

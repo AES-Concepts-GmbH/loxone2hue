@@ -54,16 +54,24 @@ export interface Scene {
 export interface Sensor {
   id: string;
   name: string;
-  type: string; // "motion", "temperature", "light_level", "button", "contact", "relative_rotary", "device_power"
+  // CLIP v2 resource type: "motion", "temperature", "light_level", "button",
+  // "contact", "relative_rotary", "device_power", and the bridge's room/home
+  // aggregates "grouped_motion", "grouped_light_level".
+  type: string;
   device_id?: string;
   owner?: string;
+  /** "device" (physical sensor), "room" or "home" (aggregated by the bridge) */
+  scope?: 'device' | 'room' | 'home';
   state: SensorState;
 }
 
 export interface SensorState {
   motion?: boolean;
   temperature?: number;
+  /** Raw bridge value: 10000 * log10(lux) + 1 */
   light_level?: number;
+  /** light_level converted to lux */
+  lux?: number;
   button_event?: string;
   control_id?: number;
   contact_state?: string;

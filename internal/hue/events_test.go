@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/sbeyeler/loxone2hue/internal/models"
 )
 
 const testEventPayload = `[{"creationtime":"2024-01-01T00:00:00Z","type":"update",` +
@@ -219,5 +221,50 @@ func TestDroppedEventsAreCounted(t *testing.T) {
 
 	if got := c.DroppedEvents(); got != 5 {
 		t.Errorf("DroppedEvents = %d, want 5", got)
+	}
+}
+
+// TestGroupedSensorEventsUpdateCache makes sure the aggregated room sensors
+// take the same event path as their per-device counterparts: a grouped_motion
+// event flips the cached motion flag, a grouped_light_level event stores the
+// raw level and its lux value.
+func TestGroupedSensorEventsUpdateCache(t *testing.T) {
+	c := NewClient("", "")
+
+	off := false
+	c.mu.Lock()
+	c.sensors["gm-room"] = &models.Sensor{ID: "gm-room", Type: "grouped_motion", State: models.SensorState{Motion: &off, Enabled: true}}
+	c.sensors["gl-room"] = &models.Sensor{ID: "gl-room", Type: "grouped_light_level", State: models.SensorState{Enabled: true}}
+	c.mu.Unlock()
+
+	c.processEvent(`[{"creationtime":"2026-10-12T21:44:39Z","type":"update","data":[` +
+		`{"id":"gm-room","type":"grouped_motion","owner":{"rid":"room-1","rtype":"room"},` +
+		`"motion":{"motion_report":{"changed":"2026-10-12T21:44:39.707Z","motion":true}}},` +
+		`{"id":"gl-room","type":"grouped_light_level","owner":{"rid":"room-1","rtype":"room"},` +
+		`"light":{"light_level_report":{"changed":"2026-10-12T21:44:39.707Z","light_level":30001}}}]}]`)
+
+	motion := c.GetSensor("gm-room")
+	if motion == nil || motion.State.Motion == nil || !*motion.State.Motion {
+		t.Errorf("grouped_motion event did not set motion: %+v", motion)
+	}
+	light := c.GetSensor("gl-room")
+	if light == nil || light.State.LightLevel == nil || *light.State.LightLevel != 30001 || light.State.Lux == nil || *light.State.Lux != 1000 {
+		t.Errorf("grouped_light_level event did not set level/lux: %+v", light)
+	}
+
+	// Both must have been forwarded as sensor events.
+	got := 0
+	for i := 0; i < 2; i++ {
+		select {
+		case ev := <-c.Events():
+			if !IsSensorType(ev.Type) {
+				t.Errorf("event type %s is not recognised as a sensor", ev.Type)
+			}
+			got++
+		default:
+		}
+	}
+	if got != 2 {
+		t.Errorf("forwarded %d events, want 2", got)
 	}
 }

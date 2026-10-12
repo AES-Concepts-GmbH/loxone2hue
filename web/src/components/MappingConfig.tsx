@@ -3,6 +3,7 @@ import { Mapping, Light, Group, Scene, Sensor } from '../types';
 import * as api from '../services/api';
 import { Link2, Plus, Trash2, Edit2, Save, X, Lightbulb, Home, Play, Copy, Check, Terminal, ExternalLink, Download, Upload, AlertCircle, FileDown, ChevronUp, ChevronDown, Power, Layers, WifiOff, Sun, SunDim, PowerOff, Activity } from 'lucide-react';
 import { Tooltip } from './Tooltip';
+import { sensorKind } from '../utils/sensors';
 
 interface MappingConfigProps {
   lights: Light[];
@@ -698,13 +699,17 @@ export function MappingConfig({ lights, groups, scenes, sensors = [], onNavigate
   };
 
   const getSensorFeedbackInfo = (sensorType: string): { property: string; range: string; example: string }[] => {
-    switch (sensorType) {
+    // Room/home aggregates (grouped_*) use the same properties as the device sensors.
+    switch (sensorKind(sensorType)) {
       case 'motion':
         return [{ property: 'motion', range: '0 / 1', example: 'motion:1' }];
       case 'temperature':
         return [{ property: 'temperature', range: 'z.B. 21.5 (°C)', example: 'temperature:21.5' }];
       case 'light_level':
-        return [{ property: 'light_level', range: '0–100000 (Lux)', example: 'light_level:12500' }];
+        return [
+          { property: 'light_level', range: 'Hue-Rohwert: 10000·log10(Lux)+1', example: 'light_level:20001' },
+          { property: 'lux', range: '0–100000 (Lux)', example: 'lux:100' },
+        ];
       case 'button':
         return [{ property: 'button', range: '0=press, 2=short, 3=long_release, 4=long_press', example: 'button:2' }];
       case 'contact':

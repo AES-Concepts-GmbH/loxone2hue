@@ -14,22 +14,6 @@ import (
 	"github.com/sbeyeler/loxone2hue/internal/models"
 )
 
-// sensorTypes lists HUE resource types that are sensors
-var sensorTypes = map[string]bool{
-	"motion":          true,
-	"temperature":     true,
-	"light_level":     true,
-	"button":          true,
-	"contact":         true,
-	"relative_rotary": true,
-	"device_power":    true,
-}
-
-// IsSensorType returns true if the resource type is a sensor
-func IsSensorType(resourceType string) bool {
-	return sensorTypes[resourceType]
-}
-
 // reconnectDelay is how long to wait before re-opening the event stream.
 const reconnectDelay = 5 * time.Second
 
@@ -368,8 +352,8 @@ func (c *Client) updateFromEvent(item EventItem) {
 func (c *Client) updateSensorFromEvent(sensor *models.Sensor, item EventItem) {
 	now := time.Now().UTC().Format(time.RFC3339)
 
-	switch item.Type {
-	case "motion":
+	switch SensorKind(item.Type) {
+	case KindMotion:
 		if item.Motion != nil {
 			motion := item.Motion.Motion
 			if item.Motion.MotionReport != nil {
@@ -381,7 +365,7 @@ func (c *Client) updateSensorFromEvent(sensor *models.Sensor, item EventItem) {
 			sensor.State.Motion = &motion
 		}
 
-	case "temperature":
+	case KindTemperature:
 		if item.Temperature != nil {
 			temp := item.Temperature.Temperature
 			if item.Temperature.TemperatureReport != nil {
@@ -393,7 +377,7 @@ func (c *Client) updateSensorFromEvent(sensor *models.Sensor, item EventItem) {
 			sensor.State.Temperature = &temp
 		}
 
-	case "light_level":
+	case KindLightLevel:
 		if item.LightSensor != nil {
 			level := item.LightSensor.LightLevel
 			if item.LightSensor.LightLevelReport != nil {
@@ -402,10 +386,10 @@ func (c *Client) updateSensorFromEvent(sensor *models.Sensor, item EventItem) {
 			} else {
 				sensor.State.LastUpdated = now
 			}
-			sensor.State.LightLevel = &level
+			sensor.State.SetLightLevel(level)
 		}
 
-	case "button":
+	case KindButton:
 		if item.Button != nil {
 			event := item.Button.LastEvent
 			if item.Button.ButtonReport != nil {
@@ -419,13 +403,13 @@ func (c *Client) updateSensorFromEvent(sensor *models.Sensor, item EventItem) {
 			}
 		}
 
-	case "contact":
+	case KindContact:
 		if item.ContactReport != nil {
 			sensor.State.ContactState = &item.ContactReport.State
 			sensor.State.LastUpdated = item.ContactReport.Changed
 		}
 
-	case "relative_rotary":
+	case KindRotary:
 		if item.RelativeRotary != nil && item.RelativeRotary.RotaryReport != nil {
 			sensor.State.RotaryAction = &item.RelativeRotary.RotaryReport.Action
 			steps := item.RelativeRotary.RotaryReport.Rotation.Steps
@@ -436,7 +420,7 @@ func (c *Client) updateSensorFromEvent(sensor *models.Sensor, item EventItem) {
 			sensor.State.LastUpdated = item.RelativeRotary.RotaryReport.Updated
 		}
 
-	case "device_power":
+	case KindPower:
 		if item.PowerState != nil {
 			sensor.State.BatteryLevel = &item.PowerState.BatteryLevel
 			sensor.State.BatteryState = &item.PowerState.BatteryState
