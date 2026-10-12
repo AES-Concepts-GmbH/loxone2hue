@@ -3,13 +3,16 @@ package api
 import (
 	"encoding/json"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/gorilla/mux"
 	"github.com/sbeyeler/loxone2hue/internal/config"
 	"github.com/sbeyeler/loxone2hue/internal/hue"
 	"github.com/sbeyeler/loxone2hue/internal/loxone"
+	"github.com/sbeyeler/loxone2hue/internal/models"
 )
 
 func newTestHandlers(t *testing.T) *Handlers {
@@ -116,5 +119,78 @@ func TestPairBridgeFailureKeepsCurrentBridge(t *testing.T) {
 	}
 	if !client.IsConfigured() {
 		t.Error("client lost its configuration after a failed pairing")
+	}
+}
+
+// breakConfigStorage makes config.Save fail by replacing the config directory
+// with a plain file. chmod would not do: the tests may run as root.
+func breakConfigStorage(t *testing.T) {
+	t.Helper()
+	dir := filepath.Dir(config.GetPath())
+	if err := os.RemoveAll(dir); err != nil {
+		t.Fatalf("remove config dir: %v", err)
+	}
+	if err := os.WriteFile(dir, []byte("not a directory"), 0600); err != nil {
+		t.Fatalf("block config dir: %v", err)
+	}
+	if err := config.Save(); err == nil {
+		t.Fatal("config.Save unexpectedly succeeded on a blocked directory")
+	}
+}
+
+// TestMappingWritesFailWhenConfigIsNotWritable covers the read-only volume
+// case from the Dockerfile notes: the handlers used to log the save error and
+// answer 200/201 anyway, so mappings "worked" until the next restart and were
+// then gone. Now the client gets a 500 and memory is rolled back to what is
+// on disk.
+func TestMappingWritesFailWhenConfigIsNotWritable(t *testing.T) {
+	h := newTestHandlers(t)
+	config.UpdateMappings([]models.Mapping{
+		{ID: "keep", LoxoneID: "wz", HueID: "1", HueType: "light", Enabled: true},
+	})
+	h.mappingManager.Load(config.GetMappings())
+	if err := config.Save(); err != nil {
+		t.Fatalf("initial save: %v", err)
+	}
+
+	breakConfigStorage(t)
+
+	// Create
+	rec := httptest.NewRecorder()
+	h.CreateMapping(rec, httptest.NewRequest("POST", "/api/mappings",
+		strings.NewReader(`{"loxone_id":"neu","hue_id":"2","hue_type":"light"}`)))
+	if rec.Code != 500 {
+		t.Errorf("create: status = %d, want 500 (body %s)", rec.Code, rec.Body.String())
+	}
+	if h.mappingManager.GetByLoxoneID("neu") != nil {
+		t.Error("create: mapping stayed in the manager although it was never saved")
+	}
+
+	// Update
+	rec = httptest.NewRecorder()
+	h.UpdateMapping(rec, mux.SetURLVars(httptest.NewRequest("PUT", "/api/mappings/keep",
+		strings.NewReader(`{"loxone_id":"wz_neu","hue_id":"1","hue_type":"light","enabled":true}`)),
+		map[string]string{"id": "keep"}))
+	if rec.Code != 500 {
+		t.Errorf("update: status = %d, want 500 (body %s)", rec.Code, rec.Body.String())
+	}
+	if h.mappingManager.GetByLoxoneID("wz") == nil || h.mappingManager.GetByLoxoneID("wz_neu") != nil {
+		t.Error("update: manager does not reflect the unsaved rollback")
+	}
+
+	// Delete
+	rec = httptest.NewRecorder()
+	h.DeleteMapping(rec, mux.SetURLVars(httptest.NewRequest("DELETE", "/api/mappings/keep", nil),
+		map[string]string{"id": "keep"}))
+	if rec.Code != 500 {
+		t.Errorf("delete: status = %d, want 500 (body %s)", rec.Code, rec.Body.String())
+	}
+	if h.mappingManager.GetByLoxoneID("wz") == nil {
+		t.Error("delete: mapping vanished from the manager although the deletion was not saved")
+	}
+
+	got := config.GetMappings()
+	if len(got) != 1 || got[0].LoxoneID != "wz" {
+		t.Errorf("config mappings after failed writes = %+v, want the single saved one", got)
 	}
 }

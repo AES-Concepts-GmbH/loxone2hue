@@ -2,6 +2,8 @@
 
 ## 1.3.3
 
+- Backup-Liste und die Antworten auf Backup anlegen/hochladen enthalten nur noch Metadaten (ID, Version, Zeitpunkt, Bemerkung, Anzahl Mappings und Miniserver). Bisher lieferte die Liste bei jedem Oeffnen des Einstellungs-Tabs alle Backups komplett inklusive Hue-Application-Key und Miniserver-Passwoertern an den Browser. Der Download liefert weiterhin die vollstaendige Datei
+- Mapping anlegen, aendern, loeschen und Pairing antworten mit HTTP 500, wenn die Konfiguration nicht gespeichert werden kann (z. B. configs-Verzeichnis gehoert nicht UID 1000), und nehmen die Aenderung im Speicher zurueck. Bisher wurde der Fehler nur geloggt und mit 200/201 quittiert, die Aenderung war nach dem naechsten Neustart weg
 - Feedback an Loxone laeuft in einem eigenen Worker mit Warteschlange. Bisher blockierte ein nicht erreichbarer Miniserver (HTTP-Feedback, 5 s Timeout pro Aufruf) die gesamte Event-Verarbeitung, der Event-Puffer lief voll und Statusaenderungen gingen stillschweigend verloren
 - HTTP-Feedback: Timeout auf 2 s gesenkt; ein Miniserver, der nicht antwortet, wird fuer 10 s uebersprungen statt jede Meldung bis zum Timeout zu blockieren
 - Verworfene Bridge-Events und Feedback-Meldungen werden gezaehlt, einmal pro 10 s als Warnung geloggt und unter /api/health ausgewiesen (dropped_bridge_events, dropped_feedback)
