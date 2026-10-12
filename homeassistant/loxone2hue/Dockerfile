@@ -7,7 +7,7 @@ ARG BUILD_ARCH=aarch64
 
 #---------------------------------------------
 # Build stage for Go backend
-FROM golang:1.22-alpine AS go-builder
+FROM golang:1.27-alpine AS go-builder
 
 ARG BUILD_ARCH=aarch64
 
@@ -34,7 +34,7 @@ RUN GOARCH_MAP="" && \
 
 #---------------------------------------------
 # Build stage for frontend
-FROM node:20-alpine AS web-builder
+FROM node:22-alpine AS web-builder
 
 WORKDIR /build
 
@@ -50,7 +50,7 @@ RUN VERSION=$(cat /build/VERSION) && BUILD_DATE=$(date -u +%Y-%m-%d) && \
 
 #---------------------------------------------
 # Final stage - Home Assistant base image
-FROM ${BUILD_FROM:-ghcr.io/home-assistant/aarch64-base:3.18}
+FROM ${BUILD_FROM:-ghcr.io/home-assistant/aarch64-base:3.22}
 
 # Install runtime dependencies
 RUN apk add --no-cache \

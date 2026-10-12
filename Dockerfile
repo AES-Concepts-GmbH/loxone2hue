@@ -1,5 +1,5 @@
 # Build stage for Go backend
-FROM golang:1.22-alpine AS go-builder
+FROM golang:1.27-alpine AS go-builder
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ COPY . .
 RUN go mod tidy && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o gateway ./cmd/gateway
 
 # Build stage for React frontend
-FROM node:20-alpine AS web-builder
+FROM node:22-alpine AS web-builder
 
 WORKDIR /app/web
 
@@ -33,7 +33,7 @@ RUN export VITE_APP_VERSION=$(cat /tmp/VERSION | tr -d '[:space:]') && \
     npm run build
 
 # Final stage
-FROM alpine:3.19
+FROM alpine:3.22
 
 WORKDIR /app
 

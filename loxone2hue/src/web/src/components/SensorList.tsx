@@ -58,11 +58,12 @@ function formatSensorValue(sensor: Sensor): string {
       return s.motion ? 'Bewegung erkannt' : 'Keine Bewegung';
     case 'temperature':
       return s.temperature != null ? `${s.temperature.toFixed(1)} \u00B0C` : '--';
-    case 'light_level':
+    case 'light_level': {
       if (s.light_level == null) return '--';
       // HUE light level is in 10000 * log10(lux) + 1
       const lux = Math.pow(10, (s.light_level - 1) / 10000);
       return `${Math.round(lux)} Lux`;
+    }
     case 'button':
       return s.button_event || '--';
     case 'contact':

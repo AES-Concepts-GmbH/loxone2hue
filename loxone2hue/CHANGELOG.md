@@ -2,6 +2,11 @@
 
 ## 1.3.3
 
+- Toolchain aktualisiert: Go 1.27 (go.mod, alle Dockerfiles), Node 22, Alpine 3.22, Home-Assistant-Base-Images 3.22. Die bisherige Toolchain (Go 1.22, Node 20, Alpine 3.18/3.19) war komplett End-of-Life
+- Go-Abhaengigkeiten aktualisiert (u. a. golang.org/x/net 0.17 -> 0.61, zerolog 1.31 -> 1.35). govulncheck meldet mit aktuellem Go-Patch keine erreichbaren Schwachstellen mehr (vorher 49)
+- GitHub-Action (.github/workflows/ci.yml): gofmt, go vet, go test -race, govulncheck, Web-UI lint/typecheck/build sowie Pruefung, dass die Add-on-Quellbaeume mit dem Root synchron sind
+- Web-UI: ESLint auf Version 10 mit Flat-Config (eslint.config.js) und typescript-eslint 8. npm run lint hatte bisher keine Konfiguration und brach ab; alle Befunde behoben, UDP-Hilfsfunktionen nach src/utils/udp.ts verschoben
+- Alle Go-Dateien gofmt-formatiert
 - Backup-Liste und die Antworten auf Backup anlegen/hochladen enthalten nur noch Metadaten (ID, Version, Zeitpunkt, Bemerkung, Anzahl Mappings und Miniserver). Bisher lieferte die Liste bei jedem Oeffnen des Einstellungs-Tabs alle Backups komplett inklusive Hue-Application-Key und Miniserver-Passwoertern an den Browser. Der Download liefert weiterhin die vollstaendige Datei
 - Mapping anlegen, aendern, loeschen und Pairing antworten mit HTTP 500, wenn die Konfiguration nicht gespeichert werden kann (z. B. configs-Verzeichnis gehoert nicht UID 1000), und nehmen die Aenderung im Speicher zurueck. Bisher wurde der Fehler nur geloggt und mit 200/201 quittiert, die Aenderung war nach dem naechsten Neustart weg
 - Feedback an Loxone laeuft in einem eigenen Worker mit Warteschlange. Bisher blockierte ein nicht erreichbarer Miniserver (HTTP-Feedback, 5 s Timeout pro Aufruf) die gesamte Event-Verarbeitung, der Event-Puffer lief voll und Statusaenderungen gingen stillschweigend verloren

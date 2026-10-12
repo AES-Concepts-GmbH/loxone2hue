@@ -123,7 +123,7 @@ export function SettingsPanel() {
       await loadBackups();
       setBackupMessage({ type: 'success', text: 'Backup erstellt' });
       setTimeout(() => setBackupMessage(null), 3000);
-    } catch (err) {
+    } catch {
       setBackupMessage({ type: 'error', text: 'Fehler beim Erstellen des Backups' });
     } finally {
       setCreatingBackup(false);
@@ -135,7 +135,7 @@ export function SettingsPanel() {
       await api.deleteBackup(id);
       setBackupDeleteConfirm(null);
       await loadBackups();
-    } catch (err) {
+    } catch {
       setBackupMessage({ type: 'error', text: 'Fehler beim Löschen' });
     }
   };
@@ -148,7 +148,7 @@ export function SettingsPanel() {
       await loadConfig();
       setBackupMessage({ type: 'success', text: 'Konfiguration wiederhergestellt' });
       setTimeout(() => setBackupMessage(null), 3000);
-    } catch (err) {
+    } catch {
       setBackupMessage({ type: 'error', text: 'Fehler beim Wiederherstellen' });
     }
   };
@@ -168,7 +168,7 @@ export function SettingsPanel() {
       await loadBackups();
       setBackupMessage({ type: 'success', text: 'Backup importiert' });
       setTimeout(() => setBackupMessage(null), 3000);
-    } catch (err) {
+    } catch {
       setBackupMessage({ type: 'error', text: 'Fehler beim Import der Backup-Datei' });
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';
