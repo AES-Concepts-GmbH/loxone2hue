@@ -41,6 +41,31 @@ type BackupHueConfig struct {
 	ApplicationKey string `json:"application_key"`
 }
 
+// BackupSummary is what the API hands out for a backup in listings and as
+// the result of creating or uploading one. A backup file holds the HUE
+// application key and the Miniserver passwords; the Web UI only needs the
+// metadata, and the full file stays behind the download endpoint.
+type BackupSummary struct {
+	ID              string    `json:"id"`
+	Version         string    `json:"version"`
+	CreatedAt       time.Time `json:"created_at"`
+	Remark          string    `json:"remark"`
+	MappingCount    int       `json:"mapping_count"`
+	MiniserverCount int       `json:"miniserver_count"`
+}
+
+// summarize strips a backup down to its metadata.
+func summarize(b ConfigBackup) BackupSummary {
+	return BackupSummary{
+		ID:              b.ID,
+		Version:         b.Version,
+		CreatedAt:       b.CreatedAt,
+		Remark:          b.Remark,
+		MappingCount:    len(b.Config.Mappings),
+		MiniserverCount: len(b.Config.Loxone.Miniservers),
+	}
+}
+
 // backupsDir returns the path to the backups directory
 func backupsDir() string {
 	cfgPath := config.GetPath()
@@ -77,7 +102,7 @@ func (h *Handlers) ListBackups(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			jsonResponse(w, http.StatusOK, map[string]interface{}{
-				"backups": []ConfigBackup{},
+				"backups": []BackupSummary{},
 			})
 			return
 		}
@@ -85,7 +110,7 @@ func (h *Handlers) ListBackups(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var backups []ConfigBackup
+	backups := make([]BackupSummary, 0, len(entries))
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 			continue
@@ -98,7 +123,7 @@ func (h *Handlers) ListBackups(w http.ResponseWriter, r *http.Request) {
 		if err := json.Unmarshal(data, &backup); err != nil {
 			continue
 		}
-		backups = append(backups, backup)
+		backups = append(backups, summarize(backup))
 	}
 
 	// Sort by creation date, newest first
@@ -157,7 +182,7 @@ func (h *Handlers) CreateBackup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Info().Str("id", backup.ID).Str("remark", backup.Remark).Msg("Configuration backup created")
-	jsonResponse(w, http.StatusCreated, backup)
+	jsonResponse(w, http.StatusCreated, summarize(backup))
 }
 
 // DeleteBackup deletes a specific backup
@@ -253,7 +278,7 @@ func (h *Handlers) UploadBackup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Info().Str("id", backup.ID).Str("remark", backup.Remark).Msg("Configuration backup uploaded")
-	jsonResponse(w, http.StatusCreated, backup)
+	jsonResponse(w, http.StatusCreated, summarize(backup))
 }
 
 // RestoreBackup restores the configuration from a backup

@@ -41,6 +41,26 @@ func NewHandlers(hueClient *hue.Client, mappingManager *loxone.MappingManager, u
 	}
 }
 
+// saveConfig persists the configuration and reports failure to the client.
+// On failure it runs rollback so memory and disk do not drift apart: a
+// mapping that only exists in memory "works" until the next restart and is
+// then gone, which is exactly the failure mode a read-only config volume
+// used to produce silently. Returns false when the response has been sent.
+func saveConfig(w http.ResponseWriter, what string, rollback func()) bool {
+	err := config.Save()
+	if err == nil {
+		return true
+	}
+
+	log.Error().Err(err).Str("path", config.GetPath()).Msgf("Failed to save config after %s", what)
+	if rollback != nil {
+		rollback()
+	}
+	errorResponse(w, http.StatusInternalServerError,
+		fmt.Sprintf("%s not saved: configuration file is not writable (%v)", what, err))
+	return false
+}
+
 // JSON response helper
 func jsonResponse(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
@@ -212,10 +232,13 @@ func (h *Handlers) PairBridge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Save configuration
+	// Save configuration. The pairing itself succeeded, but a key that is not
+	// on disk is lost at the next restart, so treat that as a failure and
+	// leave the previously configured bridge in place.
+	prevHue := config.Get().Hue
 	config.UpdateHue(req.BridgeIP, appKey)
-	if err := config.Save(); err != nil {
-		log.Error().Err(err).Msg("Failed to save config")
+	if !saveConfig(w, "pairing", func() { config.UpdateHue(prevHue.BridgeIP, prevHue.ApplicationKey) }) {
+		return
 	}
 
 	// Bring the event stream up against the freshly paired bridge, so status
@@ -417,13 +440,16 @@ func (h *Handlers) CreateMapping(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	prev := config.GetMappings()
 	mappings = append(mappings, mapping)
 	config.UpdateMappings(mappings)
-
 	h.mappingManager.Add(&mapping)
 
-	if err := config.Save(); err != nil {
-		log.Error().Err(err).Msg("Failed to save config")
+	if !saveConfig(w, "mapping", func() {
+		config.UpdateMappings(prev)
+		h.mappingManager.Load(prev)
+	}) {
+		return
 	}
 
 	jsonResponse(w, http.StatusCreated, mapping)
@@ -440,6 +466,7 @@ func (h *Handlers) UpdateMapping(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	prev := config.GetMappings()
 	mappings := config.GetMappings()
 	found := false
 	for i, m := range mappings {
@@ -459,8 +486,11 @@ func (h *Handlers) UpdateMapping(w http.ResponseWriter, r *http.Request) {
 	config.UpdateMappings(mappings)
 	h.mappingManager.Load(mappings)
 
-	if err := config.Save(); err != nil {
-		log.Error().Err(err).Msg("Failed to save config")
+	if !saveConfig(w, "mapping update", func() {
+		config.UpdateMappings(prev)
+		h.mappingManager.Load(prev)
+	}) {
+		return
 	}
 
 	jsonResponse(w, http.StatusOK, update)
@@ -491,8 +521,11 @@ func (h *Handlers) DeleteMapping(w http.ResponseWriter, r *http.Request) {
 	config.UpdateMappings(newMappings)
 	h.mappingManager.Remove(id)
 
-	if err := config.Save(); err != nil {
-		log.Error().Err(err).Msg("Failed to save config")
+	if !saveConfig(w, "mapping deletion", func() {
+		config.UpdateMappings(mappings)
+		h.mappingManager.Load(mappings)
+	}) {
+		return
 	}
 
 	jsonResponse(w, http.StatusOK, map[string]string{"status": "deleted"})

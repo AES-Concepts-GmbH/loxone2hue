@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Settings, Radio, Globe, Save, CheckCircle, AlertCircle, ScrollText, Search, RefreshCw, Plus, Trash2, Download, Upload, RotateCcw, Archive, Clock } from 'lucide-react';
 import * as api from '../services/api';
-import type { MiniserverConfig, LoxoneConfig, LogEntry, ConfigBackup } from '../services/api';
+import type { MiniserverConfig, LoxoneConfig, LogEntry, ConfigBackup, BackupSummary } from '../services/api';
 
 const LEVEL_STYLES: Record<string, string> = {
   DEBUG: 'bg-gray-600 text-gray-200',
@@ -36,7 +36,7 @@ export function SettingsPanel() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   // Backup state
-  const [backups, setBackups] = useState<ConfigBackup[]>([]);
+  const [backups, setBackups] = useState<BackupSummary[]>([]);
   const [backupsLoading, setBackupsLoading] = useState(false);
   const [backupRemark, setBackupRemark] = useState('');
   const [creatingBackup, setCreatingBackup] = useState(false);
@@ -544,7 +544,7 @@ export function SettingsPanel() {
                     <p className="text-sm text-gray-400 mt-0.5 ml-5">{backup.remark}</p>
                   )}
                   <p className="text-xs text-gray-500 mt-0.5 ml-5">
-                    {backup.config.mappings?.length ?? 0} Mappings &bull; {backup.config.loxone?.miniservers?.length ?? 0} Miniserver
+                    {backup.mapping_count} Mappings &bull; {backup.miniserver_count} Miniserver
                   </p>
                 </div>
 

@@ -230,12 +230,24 @@ export interface ConfigBackup {
   };
 }
 
+// What the API returns for a backup in listings and after create/upload.
+// The full file (with HUE key and Miniserver passwords) is only available
+// through the download endpoint.
+export interface BackupSummary {
+  id: string;
+  version: string;
+  created_at: string;
+  remark: string;
+  mapping_count: number;
+  miniserver_count: number;
+}
+
 // Backup endpoints
-export async function listBackups(): Promise<{ backups: ConfigBackup[] }> {
+export async function listBackups(): Promise<{ backups: BackupSummary[] }> {
   return fetchJSON(`${API_BASE}/backups`);
 }
 
-export async function createBackup(remark: string): Promise<ConfigBackup> {
+export async function createBackup(remark: string): Promise<BackupSummary> {
   return fetchJSON(`${API_BASE}/backups`, {
     method: 'POST',
     body: JSON.stringify({ remark }),
@@ -246,7 +258,7 @@ export async function deleteBackup(id: string): Promise<void> {
   await fetchJSON(`${API_BASE}/backups/${id}`, { method: 'DELETE' });
 }
 
-export async function uploadBackup(backup: ConfigBackup): Promise<ConfigBackup> {
+export async function uploadBackup(backup: ConfigBackup): Promise<BackupSummary> {
   return fetchJSON(`${API_BASE}/backups/upload`, {
     method: 'POST',
     body: JSON.stringify(backup),
