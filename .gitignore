@@ -12,9 +12,6 @@ web/dist/
 dist/
 
 # Config (contains secrets)
-# Leading **/ so this also catches the copies under loxone2hue/src and
-# homeassistant/loxone2hue/src — a plain "configs/config.yaml" is anchored to
-# the repository root and let the live config through into both add-on trees.
 **/configs/config.yaml
 # Backups carry the HUE application key and the Miniserver passwords
 **/configs/backups/

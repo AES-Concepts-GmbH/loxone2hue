@@ -30,12 +30,12 @@ Ein Gateway Service zur bidirektionalen Steuerung von Philips HUE Geräten über
 
 ### Home Assistant Add-on (empfohlen)
 
-Das einfachste Setup ist als Home Assistant Add-on:
+Das einfachste Setup ist als Home Assistant Add-on. Das Add-on wird als fertiges Image von GitHub Container Registry geladen (`ghcr.io/aes-concepts-gmbh/loxone2hue-{arch}`), auf dem Home-Assistant-Host wird nichts gebaut.
 
 1. **Repository hinzufügen:**
    - Gehe zu **Einstellungen** → **Add-ons** → **Add-on Store**
    - Klicke auf das **⋮** Menü (oben rechts) → **Repositories**
-   - Füge hinzu: `https://github.com/stefanbeyeler/Loxone2HUE`
+   - Füge hinzu: `https://github.com/AES-Concepts-GmbH/loxone2hue`
 
 2. **Add-on installieren:**
    - Suche nach "Loxone2HUE Gateway"

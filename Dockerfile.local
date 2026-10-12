@@ -8,13 +8,18 @@ FROM golang:1.27-alpine AS go-builder
 WORKDIR /build
 RUN apk add --no-cache git ca-certificates
 
-# Copy source code and regenerate go.sum
-COPY . .
-RUN rm -f go.sum && go mod tidy
+# Dependencies first, pinned by go.sum
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
+
+COPY cmd ./cmd
+COPY internal ./internal
+COPY VERSION ./VERSION
 
 # Build for local architecture
-RUN CGO_ENABLED=0 go build \
-    -ldflags="-w -s" \
+RUN VERSION=$(tr -d '[:space:]' < VERSION) && BUILD_DATE=$(date -u +%Y-%m-%d) && \
+    CGO_ENABLED=0 go build -trimpath \
+    -ldflags="-w -s -X main.version=${VERSION} -X main.buildTime=${BUILD_DATE}" \
     -o gateway ./cmd/gateway
 
 #---------------------------------------------

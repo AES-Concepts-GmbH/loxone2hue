@@ -3,23 +3,28 @@ FROM golang:1.27-alpine AS go-builder
 
 WORKDIR /app
 
-# Install build dependencies
-RUN apk add --no-cache git
+# Dependencies first, pinned by go.sum, so a rebuild cannot pick up other
+# module versions and the layer is cached across source changes.
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
 
-# Copy source code first
-COPY . .
+COPY cmd ./cmd
+COPY internal ./internal
+COPY VERSION ./VERSION
 
-# Download dependencies and build
-RUN go mod tidy && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o gateway ./cmd/gateway
+RUN VERSION=$(tr -d '[:space:]' < VERSION) && BUILD_DATE=$(date -u +%Y-%m-%d) && \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath \
+    -ldflags="-w -s -X main.version=${VERSION} -X main.buildTime=${BUILD_DATE}" \
+    -o gateway ./cmd/gateway
 
 # Build stage for React frontend
 FROM node:22-alpine AS web-builder
 
 WORKDIR /app/web
 
-# Copy package files and install dependencies
-COPY web/package.json ./
-RUN npm install
+# Copy package files and install the locked dependency tree
+COPY web/package.json web/package-lock.json ./
+RUN npm ci --no-audit --no-fund
 
 # Copy source code
 COPY web/ ./
