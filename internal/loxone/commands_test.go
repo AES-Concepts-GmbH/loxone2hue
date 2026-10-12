@@ -147,3 +147,53 @@ func TestGammaExpand(t *testing.T) {
 		}
 	}
 }
+
+// TestToDeviceCommandBrightnessImpliesPower covers the exported Virtual Output
+// template, which drives a light with a single analog "SET <id> BRI <v>".
+// The HUE API neither switches a lamp on for a dimming write nor accepts 0, so
+// a bare brightness has to carry the power state itself.
+func TestToDeviceCommandBrightnessImpliesPower(t *testing.T) {
+	p := NewCommandParser()
+
+	parse := func(text string) models.DeviceCommand {
+		cmd, err := p.ParseText(text)
+		if err != nil {
+			t.Fatalf("ParseText(%q): %v", text, err)
+		}
+		return p.ToDeviceCommand(cmd)
+	}
+
+	// Dimmer at 60 while the lamp is off: must switch on.
+	dc := parse("SET wz_decke BRI 60")
+	if dc.On == nil || !*dc.On {
+		t.Errorf("BRI 60: on = %v, want true", dc.On)
+	}
+	if dc.Brightness == nil || *dc.Brightness != 60 {
+		t.Errorf("BRI 60: brightness = %v, want 60", dc.Brightness)
+	}
+
+	// Dimmer at 0: must switch off and must not write dimming 0, which the
+	// bridge would clamp to the minimum brightness.
+	dc = parse("SET wz_decke BRI 0")
+	if dc.On == nil || *dc.On {
+		t.Errorf("BRI 0: on = %v, want false", dc.On)
+	}
+	if dc.Brightness != nil {
+		t.Errorf("BRI 0: brightness = %v, want none", *dc.Brightness)
+	}
+
+	// Out-of-range values are clamped rather than rejected by the bridge.
+	dc = parse("SET wz_decke BRI 140")
+	if dc.Brightness == nil || *dc.Brightness != 100 {
+		t.Errorf("BRI 140: brightness = %v, want 100", dc.Brightness)
+	}
+
+	// An explicit power state wins over the derived one (JSON clients).
+	dc = p.ToDeviceCommand(&models.LoxoneCommand{
+		Type: "command", Target: "wz_decke", Action: "set",
+		Params: map[string]interface{}{"on": false, "brightness": float64(60)},
+	})
+	if dc.On == nil || *dc.On {
+		t.Errorf("explicit on=false with brightness: on = %v, want false", dc.On)
+	}
+}

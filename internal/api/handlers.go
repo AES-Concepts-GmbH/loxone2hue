@@ -22,10 +22,13 @@ import (
 
 // Handlers contains all HTTP handlers
 type Handlers struct {
-	hueClient      *hue.Client
-	mappingManager *loxone.MappingManager
-	udpSender      *loxone.UDPSender
-	httpSender     *loxone.HTTPSender
+	// feedbackDropped reports how many feedback jobs the WebSocket hub had to
+	// discard; wired by NewServer, nil in isolation.
+	feedbackDropped func() int64
+	hueClient       *hue.Client
+	mappingManager  *loxone.MappingManager
+	udpSender       *loxone.UDPSender
+	httpSender      *loxone.HTTPSender
 }
 
 // NewHandlers creates a new handlers instance
@@ -52,10 +55,17 @@ func errorResponse(w http.ResponseWriter, status int, message string) {
 
 // Health returns the service health status
 func (h *Handlers) Health(w http.ResponseWriter, r *http.Request) {
+	var feedbackDropped int64
+	if h.feedbackDropped != nil {
+		feedbackDropped = h.feedbackDropped()
+	}
+
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
-		"status":         "healthy",
-		"timestamp":      time.Now().UTC(),
-		"hue_configured": h.hueClient.IsConfigured(),
+		"status":                "healthy",
+		"timestamp":             time.Now().UTC(),
+		"hue_configured":        h.hueClient.IsConfigured(),
+		"dropped_bridge_events": h.hueClient.DroppedEvents(),
+		"dropped_feedback":      feedbackDropped,
 	})
 }
 
@@ -193,9 +203,10 @@ func (h *Handlers) PairBridge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.hueClient.SetBridgeIP(req.BridgeIP)
-
-	appKey, err := h.hueClient.Pair("Loxone2HUE", "gateway")
+	// Pair through a throwaway client. Pointing the shared client at the new
+	// address first meant a failed attempt (typo, link button not pressed)
+	// left every REST call going to the wrong bridge until the next restart.
+	appKey, err := hue.NewClient(req.BridgeIP, "").Pair("Loxone2HUE", "gateway")
 	if err != nil {
 		errorResponse(w, http.StatusBadRequest, err.Error())
 		return

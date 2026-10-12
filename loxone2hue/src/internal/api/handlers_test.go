@@ -91,3 +91,30 @@ func TestImportMappingsCountsSkipped(t *testing.T) {
 		t.Errorf("imported=%d skipped=%d total=%d, want 1/2/1", got.Imported, got.Skipped, got.Total)
 	}
 }
+
+// TestPairBridgeFailureKeepsCurrentBridge covers a typo in the pairing dialog:
+// the shared client used to be repointed before the attempt, so a failed
+// pairing broke every REST call against the bridge that was actually working.
+func TestPairBridgeFailureKeepsCurrentBridge(t *testing.T) {
+	if _, err := config.Load(filepath.Join(t.TempDir(), "config.yaml")); err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	client := hue.NewClient("192.0.2.1", "working-key")
+	h := NewHandlers(client, loxone.NewMappingManager(), loxone.NewUDPSender(), loxone.NewHTTPSender())
+
+	// Nothing listens on port 1, so the connection is refused immediately.
+	rec := httptest.NewRecorder()
+	h.PairBridge(rec, httptest.NewRequest("POST", "/api/bridge/pair",
+		strings.NewReader(`{"bridge_ip":"127.0.0.1:1"}`)))
+
+	if rec.Code != 400 {
+		t.Fatalf("status = %d, want 400 (body %s)", rec.Code, rec.Body.String())
+	}
+	if got := client.BridgeIP(); got != "192.0.2.1" {
+		t.Errorf("bridge IP after failed pairing = %q, want unchanged 192.0.2.1", got)
+	}
+	if !client.IsConfigured() {
+		t.Error("client lost its configuration after a failed pairing")
+	}
+}

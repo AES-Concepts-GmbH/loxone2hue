@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.3.3
+
+- Feedback an Loxone laeuft in einem eigenen Worker mit Warteschlange. Bisher blockierte ein nicht erreichbarer Miniserver (HTTP-Feedback, 5 s Timeout pro Aufruf) die gesamte Event-Verarbeitung, der Event-Puffer lief voll und Statusaenderungen gingen stillschweigend verloren
+- HTTP-Feedback: Timeout auf 2 s gesenkt; ein Miniserver, der nicht antwortet, wird fuer 10 s uebersprungen statt jede Meldung bis zum Timeout zu blockieren
+- Verworfene Bridge-Events und Feedback-Meldungen werden gezaehlt, einmal pro 10 s als Warnung geloggt und unter /api/health ausgewiesen (dropped_bridge_events, dropped_feedback)
+- Gruppen-Feedback nutzt die aggregierten grouped_light-Events der Bridge. Bisher wurde der Zustand der zuletzt geaenderten Einzellampe als Raumzustand gemeldet (eine Lampe aus -> Raum "aus", obwohl andere noch leuchten)
+- Gruppenbefehle verwenden die gecachte grouped_light-ID des Raums statt bei jedem Befehl alle grouped_lights von der Bridge zu laden
+- SET <id> BRI <v>: 0 schaltet aus, jeder Wert ueber 0 schaltet ein. Die Hue-API schaltet bei einem reinen Helligkeitsbefehl nicht ein und akzeptiert 0 nicht, damit funktionierte die exportierte Virtual-Output-Vorlage mit einem Loxone-Dimmer nicht
+- Virtual-Output-Export enthaelt pro Licht/Gruppe zusaetzlich einen digitalen Ein/Aus-Befehl
+- Pairing laeuft ueber einen temporaeren Client. Ein fehlgeschlagener Versuch (Tippfehler in der IP, Link-Taste nicht gedrueckt) verstellte bisher die laufende Bridge-Verbindung bis zum Neustart
+- Web-UI: Live-Status ueber WebSocket liefert den konvertierten Lichtzustand statt des rohen Bridge-Events. Bisher zeigte die UI nach dem ersten Live-Event eine per Hue-App ausgeschaltete Lampe weiter als "an", bis der 10-Sekunden-Refresh griff
+- Web-UI: Raeume und Zonen erhalten ihren Zustand live ueber group_update-Nachrichten
+
 ## 1.3.2
 
 - Authentifizierung: Optionales Passwort (auth.password) schuetzt Web-UI, API und WebSocket. Leer gelassen bleibt alles wie bisher, damit Bestandsinstallationen und das Home-Assistant-Ingress-Setup unveraendert laufen. /api/health bleibt offen fuer den Container-Healthcheck

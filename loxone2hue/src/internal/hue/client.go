@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -30,11 +31,20 @@ type Client struct {
 	groups  map[string]*models.Group
 	scenes  map[string]*models.Scene
 	sensors map[string]*models.Sensor
-	mu      sync.RWMutex
+	// groupedLights maps a grouped_light service ID to the room or zone that
+	// owns it, so aggregated group events can be attributed to the group.
+	groupedLights map[string]string
+	mu            sync.RWMutex
 
 	eventChan chan Event
 	stopChan  chan struct{}
 	closeOnce sync.Once
+
+	// droppedEvents counts events that found eventChan full. lastDropLog
+	// (unix nanos) throttles the warning so a stalled consumer does not flood
+	// the log with one line per event.
+	droppedEvents atomic.Int64
+	lastDropLog   atomic.Int64
 
 	// restart carries a nudge to the event stream supervisor whenever the
 	// bridge configuration changes. Buffered so Configure never blocks.
@@ -64,14 +74,15 @@ func NewClient(bridgeIP, applicationKey string) *Client {
 			Transport: tr,
 			Timeout:   10 * time.Second,
 		},
-		baseURL:   fmt.Sprintf("https://%s", bridgeIP),
-		lights:    make(map[string]*models.Light),
-		groups:    make(map[string]*models.Group),
-		scenes:    make(map[string]*models.Scene),
-		sensors:   make(map[string]*models.Sensor),
-		eventChan: make(chan Event, 100),
-		stopChan:  make(chan struct{}),
-		restart:   make(chan struct{}, 1),
+		baseURL:       fmt.Sprintf("https://%s", bridgeIP),
+		lights:        make(map[string]*models.Light),
+		groups:        make(map[string]*models.Group),
+		scenes:        make(map[string]*models.Scene),
+		sensors:       make(map[string]*models.Sensor),
+		groupedLights: make(map[string]string),
+		eventChan:     make(chan Event, 100),
+		stopChan:      make(chan struct{}),
+		restart:       make(chan struct{}, 1),
 	}
 }
 
@@ -372,16 +383,22 @@ func (c *Client) GetGroups() ([]*models.Group, error) {
 				On *struct {
 					On bool `json:"on"`
 				} `json:"on"`
+				Dimming *struct {
+					Brightness float64 `json:"brightness"`
+				} `json:"dimming"`
 			} `json:"data"`
 		}
 		if err := json.Unmarshal(glResp, &glResult); err == nil {
 			for _, gl := range glResult.Data {
+				state := models.GroupState{}
 				if gl.On != nil {
-					groupedLightStates[gl.Owner.RID] = models.GroupState{
-						AnyOn: gl.On.On,
-						AllOn: gl.On.On,
-					}
+					state.AnyOn = gl.On.On
+					state.AllOn = gl.On.On
 				}
+				if gl.Dimming != nil {
+					state.Brightness = gl.Dimming.Brightness
+				}
+				groupedLightStates[gl.Owner.RID] = state
 			}
 		}
 	}
@@ -406,7 +423,7 @@ func (c *Client) GetGroups() ([]*models.Group, error) {
 		if state, ok := groupedLightStates[group.ID]; ok {
 			group.State = state
 		}
-		c.groups[group.ID] = group
+		c.storeGroupLocked(group)
 		groups = append(groups, group)
 	}
 	c.mu.Unlock()
@@ -428,7 +445,7 @@ func (c *Client) GetGroups() ([]*models.Group, error) {
 				if state, ok := groupedLightStates[group.ID]; ok {
 					group.State = state
 				}
-				c.groups[group.ID] = group
+				c.storeGroupLocked(group)
 				groups = append(groups, group)
 			}
 			c.mu.Unlock()
@@ -443,40 +460,21 @@ func (c *Client) GetGroups() ([]*models.Group, error) {
 func (c *Client) SetGroupState(id string, cmd models.DeviceCommand) error {
 	log.Debug().Str("group_id", id).Interface("command", cmd).Msg("SetGroupState called")
 
-	resp, err := c.request("GET", "/clip/v2/resource/grouped_light", nil)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to fetch grouped_lights")
-		return err
-	}
-
-	var result struct {
-		Data []struct {
-			ID    string `json:"id"`
-			Owner struct {
-				RID string `json:"rid"`
-			} `json:"owner"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(resp, &result); err != nil {
-		log.Error().Err(err).Msg("Failed to parse grouped_lights")
-		return err
-	}
-
-	log.Debug().Int("count", len(result.Data)).Msg("Found grouped_lights")
-
-	// Find grouped_light for this room/zone
+	// The room's services list already names its grouped_light; only fall
+	// back to listing every grouped_light when the cache does not know it.
+	c.mu.RLock()
 	var groupedLightID string
-	for _, gl := range result.Data {
-		log.Debug().Str("gl_id", gl.ID).Str("owner_rid", gl.Owner.RID).Str("looking_for", id).Msg("Checking grouped_light")
-		if gl.Owner.RID == id {
-			groupedLightID = gl.ID
-			break
-		}
+	if g, ok := c.groups[id]; ok {
+		groupedLightID = g.GroupedLightID
 	}
+	c.mu.RUnlock()
 
 	if groupedLightID == "" {
-		log.Error().Str("group_id", id).Msg("grouped_light not found for group")
-		return fmt.Errorf("grouped_light not found for group: %s", id)
+		var err error
+		groupedLightID, err = c.lookupGroupedLight(id)
+		if err != nil {
+			return err
+		}
 	}
 
 	body := make(map[string]interface{})
@@ -489,14 +487,52 @@ func (c *Client) SetGroupState(id string, cmd models.DeviceCommand) error {
 
 	log.Debug().Str("grouped_light_id", groupedLightID).Interface("body", body).Msg("Sending PUT request")
 
-	_, err = c.request("PUT", fmt.Sprintf("/clip/v2/resource/grouped_light/%s", groupedLightID), body)
-	if err != nil {
+	if _, err := c.request("PUT", fmt.Sprintf("/clip/v2/resource/grouped_light/%s", groupedLightID), body); err != nil {
 		log.Error().Err(err).Msg("Failed to update grouped_light")
 		return err
 	}
 
 	log.Debug().Str("group_id", id).Msg("Group state updated successfully")
 	return nil
+}
+
+// lookupGroupedLight asks the bridge which grouped_light belongs to a room or
+// zone and remembers the answer in the cache.
+func (c *Client) lookupGroupedLight(groupID string) (string, error) {
+	resp, err := c.request("GET", "/clip/v2/resource/grouped_light", nil)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to fetch grouped_lights")
+		return "", err
+	}
+
+	var result struct {
+		Data []struct {
+			ID    string `json:"id"`
+			Owner struct {
+				RID string `json:"rid"`
+			} `json:"owner"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(resp, &result); err != nil {
+		log.Error().Err(err).Msg("Failed to parse grouped_lights")
+		return "", err
+	}
+
+	for _, gl := range result.Data {
+		if gl.Owner.RID != groupID {
+			continue
+		}
+		c.mu.Lock()
+		if g, ok := c.groups[groupID]; ok {
+			g.GroupedLightID = gl.ID
+		}
+		c.groupedLights[gl.ID] = groupID
+		c.mu.Unlock()
+		return gl.ID, nil
+	}
+
+	log.Error().Str("group_id", groupID).Msg("grouped_light not found for group")
+	return "", fmt.Errorf("grouped_light not found for group: %s", groupID)
 }
 
 // GetScenes fetches all scenes from the bridge
@@ -544,21 +580,64 @@ func (c *Client) ActivateScene(id string) error {
 	return nil
 }
 
-// GetGroupIDsForLight returns all group (room/zone) IDs that contain the given light ID
-func (c *Client) GetGroupIDsForLight(lightID string) []string {
+// storeGroupLocked puts a group into the cache and indexes its grouped_light.
+// The caller holds c.mu.
+func (c *Client) storeGroupLocked(group *models.Group) {
+	if old, ok := c.groups[group.ID]; ok && old.GroupedLightID != "" && old.GroupedLightID != group.GroupedLightID {
+		delete(c.groupedLights, old.GroupedLightID)
+	}
+	c.groups[group.ID] = group
+	if group.GroupedLightID != "" {
+		c.groupedLights[group.GroupedLightID] = group.ID
+	}
+}
+
+// GroupIDForGroupedLight returns the room or zone that owns a grouped_light
+// service, or "" if the cache does not know it.
+func (c *Client) GroupIDForGroupedLight(groupedLightID string) string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.groupedLights[groupedLightID]
+}
+
+// LightSnapshot returns a copy of a cached light. It never talks to the
+// bridge, so it is safe to call from the event loop, and the copy can be
+// marshalled without racing against event updates to the cache.
+func (c *Client) LightSnapshot(id string) (models.Light, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	var ids []string
-	for _, g := range c.groups {
-		for _, lid := range g.Lights {
-			if lid == lightID {
-				ids = append(ids, g.ID)
-				break
-			}
-		}
+	light, ok := c.lights[id]
+	if !ok {
+		return models.Light{}, false
 	}
-	return ids
+	snap := *light
+	if light.State.Color != nil {
+		color := *light.State.Color
+		snap.State.Color = &color
+	}
+	return snap, true
+}
+
+// GroupSnapshot returns a copy of a cached room or zone, see LightSnapshot.
+func (c *Client) GroupSnapshot(id string) (models.Group, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	group, ok := c.groups[id]
+	if !ok {
+		return models.Group{}, false
+	}
+	snap := *group
+	snap.Lights = append([]string(nil), group.Lights...)
+	snap.Scenes = append([]models.Scene(nil), group.Scenes...)
+	return snap, true
+}
+
+// DroppedEvents reports how many bridge events were discarded because the
+// event consumer could not keep up.
+func (c *Client) DroppedEvents() int64 {
+	return c.droppedEvents.Load()
 }
 
 // GetGroupName returns the name of a group by ID, or empty string if not found
@@ -673,8 +752,8 @@ func (c *Client) Close() {
 
 // Internal HUE API response types
 type hueLight struct {
-	ID       string `json:"id"`
-	Owner    *struct {
+	ID    string `json:"id"`
+	Owner *struct {
 		RID   string `json:"rid"`
 		RType string `json:"rtype"`
 	} `json:"owner,omitempty"`
@@ -693,8 +772,8 @@ type hueLight struct {
 		Brightness float64 `json:"brightness"`
 	} `json:"dimming,omitempty"`
 	ColorTemperature *struct {
-		Mirek       int  `json:"mirek"`
-		MirekValid  bool `json:"mirek_valid"`
+		Mirek      int  `json:"mirek"`
+		MirekValid bool `json:"mirek_valid"`
 	} `json:"color_temperature,omitempty"`
 	Color *struct {
 		XY struct {
@@ -789,6 +868,13 @@ func convertHueRoom(hr hueRoom, deviceToLightID map[string]string) *models.Group
 		}
 	}
 
+	for _, svc := range hr.Services {
+		if svc.RType == "grouped_light" {
+			group.GroupedLightID = svc.RID
+			break
+		}
+	}
+
 	return group
 }
 
@@ -836,8 +922,8 @@ func convertHueSensor(raw json.RawMessage, sensorType string, deviceNames map[st
 	case "motion":
 		var m struct {
 			Motion struct {
-				Motion      bool   `json:"motion"`
-				MotionValid bool   `json:"motion_valid"`
+				Motion       bool `json:"motion"`
+				MotionValid  bool `json:"motion_valid"`
 				MotionReport *struct {
 					Changed string `json:"changed"`
 					Motion  bool   `json:"motion"`
@@ -858,8 +944,8 @@ func convertHueSensor(raw json.RawMessage, sensorType string, deviceNames map[st
 	case "temperature":
 		var t struct {
 			Temperature struct {
-				Temperature      float64 `json:"temperature"`
-				TemperatureValid bool    `json:"temperature_valid"`
+				Temperature       float64 `json:"temperature"`
+				TemperatureValid  bool    `json:"temperature_valid"`
 				TemperatureReport *struct {
 					Changed     string  `json:"changed"`
 					Temperature float64 `json:"temperature"`
@@ -880,8 +966,8 @@ func convertHueSensor(raw json.RawMessage, sensorType string, deviceNames map[st
 	case "light_level":
 		var l struct {
 			Light struct {
-				LightLevel      int  `json:"light_level"`
-				LightLevelValid bool `json:"light_level_valid"`
+				LightLevel       int  `json:"light_level"`
+				LightLevelValid  bool `json:"light_level_valid"`
 				LightLevelReport *struct {
 					Changed    string `json:"changed"`
 					LightLevel int    `json:"light_level"`

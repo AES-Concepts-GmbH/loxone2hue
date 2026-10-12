@@ -202,8 +202,8 @@ type EventItem struct {
 	} `json:"motion,omitempty"`
 	// Temperature sensor
 	Temperature *struct {
-		Temperature      float64 `json:"temperature"`
-		TemperatureValid bool    `json:"temperature_valid"`
+		Temperature       float64 `json:"temperature"`
+		TemperatureValid  bool    `json:"temperature_valid"`
 		TemperatureReport *struct {
 			Changed     string  `json:"changed"`
 			Temperature float64 `json:"temperature"`
@@ -211,8 +211,8 @@ type EventItem struct {
 	} `json:"temperature,omitempty"`
 	// Light level sensor
 	LightSensor *struct {
-		LightLevel      int  `json:"light_level"`
-		LightLevelValid bool `json:"light_level_valid"`
+		LightLevel       int  `json:"light_level"`
+		LightLevelValid  bool `json:"light_level_valid"`
 		LightLevelReport *struct {
 			Changed    string `json:"changed"`
 			LightLevel int    `json:"light_level"`
@@ -280,10 +280,32 @@ func (c *Client) processEvent(data string) {
 				CreatedAt: event.CreationTime,
 			}:
 			default:
-				// Channel full, skip
+				c.noteDroppedEvent(item)
 			}
 		}
 	}
+}
+
+// dropLogInterval bounds how often a full event channel is reported.
+const dropLogInterval = 10 * time.Second
+
+// noteDroppedEvent counts an event that found eventChan full and warns about
+// it at most once per dropLogInterval. The cache is already up to date at this
+// point; what is lost is the notification to Loxone and the Web UI.
+func (c *Client) noteDroppedEvent(item EventItem) {
+	total := c.droppedEvents.Add(1)
+
+	now := time.Now().UnixNano()
+	last := c.lastDropLog.Load()
+	if now-last < int64(dropLogInterval) || !c.lastDropLog.CompareAndSwap(last, now) {
+		return
+	}
+
+	log.Warn().
+		Str("id", item.ID).
+		Str("type", item.Type).
+		Int64("dropped_total", total).
+		Msg("Event channel full, dropping bridge event (feedback to Loxone lost)")
 }
 
 func (c *Client) updateFromEvent(item EventItem) {
@@ -312,6 +334,26 @@ func (c *Client) updateFromEvent(item EventItem) {
 			light.State.Color.XY = [2]float64{item.Color.XY.X, item.Color.XY.Y}
 		}
 		log.Debug().Str("id", item.ID).Msg("Light state updated from event")
+
+	case item.Type == "grouped_light":
+		groupID, ok := c.groupedLights[item.ID]
+		if !ok {
+			return
+		}
+		group, ok := c.groups[groupID]
+		if !ok {
+			return
+		}
+		if item.On != nil {
+			// The bridge reports any_on for a grouped_light; all_on is not part
+			// of the event and tracks it as an approximation.
+			group.State.AnyOn = item.On.On
+			group.State.AllOn = item.On.On
+		}
+		if item.Dimming != nil {
+			group.State.Brightness = item.Dimming.Brightness
+		}
+		log.Debug().Str("id", item.ID).Str("group_id", groupID).Msg("Group state updated from event")
 
 	case IsSensorType(item.Type):
 		sensor, ok := c.sensors[item.ID]
