@@ -2,6 +2,13 @@
 
 ## 1.3.3
 
+- API: Konfigurationszugriffe laufen ueber kopierende Getter (config.Snapshot, GetHue, GetServer, GetLoxone); der Zugriff auf das geteilte Config-Objekt ohne Lock ist entfernt. Lichter, Gruppen und Sensoren aus dem Hue-Cache werden als Kopien herausgegeben, damit API-Antworten nicht mit Event-Updates um dieselben Objekte konkurrieren
+- Befehle ueber GET /ws?cmd= und ueber WebSocket laufen durch eine gemeinsame Ausfuehrung. Dadurch: SET auf ein Szenen- oder Sensor-Mapping meldet einen Fehler statt stillschweigend "ok", eine unbekannte Loxone-ID liefert 404 statt an die Bridge als Licht-ID geschickt zu werden (rohe Hue-UUIDs bleiben erlaubt), und GET <id> STATUS funktioniert jetzt auch ueber HTTP
+- Web-UI: Gruppen schalten laesst die Geraetekarten nicht mehr neu aufbauen (Spinner, zugeklappte UDP-Bereiche, verlorene Slider-Position)
+- Web-UI: neue, geaenderte oder geloeschte Mappings erscheinen in Geraete-, Raum- und Sensor-Tab sofort statt erst nach Seiten-Reload
+- Web-UI: Helligkeits-Slider folgt Aenderungen aus Hue-App, Loxone und Auto-Refresh statt den Wert vom Seitenaufruf zu behalten
+- Web-UI: ein verspaetetes Close eines bereits ersetzten WebSockets loest keinen zweiten Reconnect mehr aus (doppelte Nachrichten im Dev-Modus)
+- Web-UI: ein Netz- oder Serverfehler beim Start zeigt eine Fehlerseite mit "Erneut versuchen" statt des Bridge-Einrichtungsdialogs
 - Toolchain aktualisiert: Go 1.27 (go.mod, alle Dockerfiles), Node 22, Alpine 3.22, Home-Assistant-Base-Images 3.22. Die bisherige Toolchain (Go 1.22, Node 20, Alpine 3.18/3.19) war komplett End-of-Life
 - Go-Abhaengigkeiten aktualisiert (u. a. golang.org/x/net 0.17 -> 0.61, zerolog 1.31 -> 1.35). govulncheck meldet mit aktuellem Go-Patch keine erreichbaren Schwachstellen mehr (vorher 49)
 - GitHub-Action (.github/workflows/ci.yml): gofmt, go vet, go test -race, govulncheck, Web-UI lint/typecheck/build sowie Pruefung, dass die Add-on-Quellbaeume mit dem Root synchron sind

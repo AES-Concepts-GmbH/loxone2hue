@@ -278,7 +278,7 @@ func (c *Client) GetLights() ([]*models.Light, error) {
 	for _, hl := range result.Data {
 		light := convertHueLight(hl)
 		c.lights[light.ID] = light
-		lights = append(lights, light)
+		lights = append(lights, cloneLight(light))
 	}
 
 	log.Debug().Int("count", len(lights)).Msg("Fetched lights from bridge")
@@ -290,7 +290,7 @@ func (c *Client) GetLight(id string) (*models.Light, error) {
 	c.mu.RLock()
 	if light, ok := c.lights[id]; ok {
 		c.mu.RUnlock()
-		return light, nil
+		return cloneLight(light), nil
 	}
 	c.mu.RUnlock()
 
@@ -315,7 +315,7 @@ func (c *Client) GetLight(id string) (*models.Light, error) {
 	c.lights[light.ID] = light
 	c.mu.Unlock()
 
-	return light, nil
+	return cloneLight(light), nil
 }
 
 // SetLightState updates the state of a light
@@ -424,7 +424,7 @@ func (c *Client) GetGroups() ([]*models.Group, error) {
 			group.State = state
 		}
 		c.storeGroupLocked(group)
-		groups = append(groups, group)
+		groups = append(groups, cloneGroup(group))
 	}
 	c.mu.Unlock()
 
@@ -446,7 +446,7 @@ func (c *Client) GetGroups() ([]*models.Group, error) {
 					group.State = state
 				}
 				c.storeGroupLocked(group)
-				groups = append(groups, group)
+				groups = append(groups, cloneGroup(group))
 			}
 			c.mu.Unlock()
 		}
@@ -611,12 +611,7 @@ func (c *Client) LightSnapshot(id string) (models.Light, bool) {
 	if !ok {
 		return models.Light{}, false
 	}
-	snap := *light
-	if light.State.Color != nil {
-		color := *light.State.Color
-		snap.State.Color = &color
-	}
-	return snap, true
+	return *cloneLight(light), true
 }
 
 // GroupSnapshot returns a copy of a cached room or zone, see LightSnapshot.
@@ -628,10 +623,51 @@ func (c *Client) GroupSnapshot(id string) (models.Group, bool) {
 	if !ok {
 		return models.Group{}, false
 	}
-	snap := *group
-	snap.Lights = append([]string(nil), group.Lights...)
-	snap.Scenes = append([]models.Scene(nil), group.Scenes...)
-	return snap, true
+	return *cloneGroup(group), true
+}
+
+// The cache hands out copies, never its own objects: handlers JSON-encode what
+// they get while updateFromEvent mutates the cached originals under c.mu.
+
+func clonePtr[T any](p *T) *T {
+	if p == nil {
+		return nil
+	}
+	v := *p
+	return &v
+}
+
+func cloneLight(l *models.Light) *models.Light {
+	c := *l
+	c.State.Color = clonePtr(l.State.Color)
+	return &c
+}
+
+func cloneGroup(g *models.Group) *models.Group {
+	c := *g
+	c.Lights = append([]string(nil), g.Lights...)
+	c.Scenes = append([]models.Scene(nil), g.Scenes...)
+	return &c
+}
+
+func cloneSensorState(s models.SensorState) models.SensorState {
+	s.Motion = clonePtr(s.Motion)
+	s.Temperature = clonePtr(s.Temperature)
+	s.LightLevel = clonePtr(s.LightLevel)
+	s.ButtonEvent = clonePtr(s.ButtonEvent)
+	s.ControlID = clonePtr(s.ControlID)
+	s.ContactState = clonePtr(s.ContactState)
+	s.RotaryAction = clonePtr(s.RotaryAction)
+	s.RotarySteps = clonePtr(s.RotarySteps)
+	s.BatteryLevel = clonePtr(s.BatteryLevel)
+	s.BatteryState = clonePtr(s.BatteryState)
+	return s
+}
+
+func cloneSensor(sn *models.Sensor) *models.Sensor {
+	c := *sn
+	c.State = cloneSensorState(sn.State)
+	return &c
 }
 
 // DroppedEvents reports how many bridge events were discarded because the
@@ -713,21 +749,26 @@ func (c *Client) GetSensors() ([]*models.Sensor, error) {
 		}
 	}
 
+	result := make([]*models.Sensor, 0, len(sensors))
 	c.mu.Lock()
 	for _, sensor := range sensors {
 		c.sensors[sensor.ID] = sensor
+		result = append(result, cloneSensor(sensor))
 	}
 	c.mu.Unlock()
 
-	log.Debug().Int("count", len(sensors)).Msg("Fetched sensors from bridge")
-	return sensors, nil
+	log.Debug().Int("count", len(result)).Msg("Fetched sensors from bridge")
+	return result, nil
 }
 
 // GetSensor returns a cached sensor by ID
 func (c *Client) GetSensor(id string) *models.Sensor {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.sensors[id]
+	if s, ok := c.sensors[id]; ok {
+		return cloneSensor(s)
+	}
+	return nil
 }
 
 // GetSensorName returns the name of a sensor by ID, or empty string
