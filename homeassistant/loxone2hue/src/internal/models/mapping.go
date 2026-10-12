@@ -10,9 +10,9 @@ import (
 type Mapping struct {
 	ID           string `json:"id" yaml:"id"`
 	Name         string `json:"name" yaml:"name"`
-	LoxoneID     string `json:"loxone_id" yaml:"loxone_id"`       // Loxone UUID or custom ID
-	HueID        string `json:"hue_id" yaml:"hue_id"`             // HUE resource ID
-	HueType      string `json:"hue_type" yaml:"hue_type"`         // "light", "group", "scene"
+	LoxoneID     string `json:"loxone_id" yaml:"loxone_id"` // Loxone UUID or custom ID
+	HueID        string `json:"hue_id" yaml:"hue_id"`       // HUE resource ID
+	HueType      string `json:"hue_type" yaml:"hue_type"`   // "light", "group", "scene"
 	Enabled      bool   `json:"enabled" yaml:"enabled"`
 	FeedbackUDP  *bool  `json:"feedback_udp,omitempty" yaml:"feedback_udp,omitempty"`
 	FeedbackHTTP *bool  `json:"feedback_http,omitempty" yaml:"feedback_http,omitempty"`
@@ -120,9 +120,9 @@ func (c *LoxoneCommand) BoolParam(key string) (bool, bool) {
 
 // LoxoneStatus represents a status update sent to Loxone
 type LoxoneStatus struct {
-	Type    string      `json:"type"` // "status"
-	Device  string      `json:"device"`
-	State   interface{} `json:"state"`
+	Type   string      `json:"type"` // "status"
+	Device string      `json:"device"`
+	State  interface{} `json:"state"`
 }
 
 // WebSocketMessage is a generic WebSocket message wrapper

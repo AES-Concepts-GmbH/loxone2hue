@@ -134,7 +134,7 @@ func DefaultConfig() *Config {
 
 // legacyLoxoneConfig is used to detect and migrate old config format
 type legacyLoxoneConfig struct {
-	Enabled      *bool `yaml:"enabled"`
+	Enabled      *bool  `yaml:"enabled"`
 	MiniserverIP string `yaml:"miniserver_ip"`
 	UDPFeedback  *struct {
 		Enabled bool `yaml:"enabled"`

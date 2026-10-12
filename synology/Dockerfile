@@ -7,7 +7,7 @@ ARG BUILD_DATE=unknown
 
 #---------------------------------------------
 # Build stage for Go backend
-FROM golang:1.22-alpine AS go-builder
+FROM golang:1.27-alpine AS go-builder
 
 ARG VERSION
 ARG BUILD_DATE
@@ -29,7 +29,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
 
 #---------------------------------------------
 # Build stage for frontend
-FROM node:20-alpine AS web-builder
+FROM node:22-alpine AS web-builder
 
 ARG VERSION
 ARG BUILD_DATE
@@ -49,7 +49,7 @@ RUN npm run build
 
 #---------------------------------------------
 # Final stage
-FROM alpine:3.19
+FROM alpine:3.22
 
 ARG VERSION
 ARG BUILD_DATE

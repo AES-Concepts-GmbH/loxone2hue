@@ -3,11 +3,11 @@
 
 # Build argument for base image (set by Home Assistant build system)
 ARG BUILD_FROM
-FROM ${BUILD_FROM:-ghcr.io/home-assistant/aarch64-base:3.18} AS base
+FROM ${BUILD_FROM:-ghcr.io/home-assistant/aarch64-base:3.22} AS base
 
 #---------------------------------------------
 # Build stage for Go backend
-FROM golang:1.22-alpine AS go-builder
+FROM golang:1.27-alpine AS go-builder
 
 ARG TARGETARCH
 
@@ -28,7 +28,7 @@ RUN VERSION=$(cat VERSION) && BUILD_DATE=$(date -u +%Y-%m-%d) && \
 
 #---------------------------------------------
 # Build stage for frontend
-FROM node:20-alpine AS web-builder
+FROM node:22-alpine AS web-builder
 
 WORKDIR /build
 

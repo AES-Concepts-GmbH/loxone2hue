@@ -419,7 +419,7 @@ export function MappingConfig({ lights, groups, scenes, sensors = [], onNavigate
 
         setImportFile(backup);
         setShowImportModal(true);
-      } catch (error) {
+      } catch {
         setImportError('Die Datei konnte nicht gelesen werden. Bitte wähle eine gültige Backup-Datei.');
       }
     };

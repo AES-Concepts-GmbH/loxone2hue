@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Lightbulb, Power, Radio } from 'lucide-react';
 import { Light } from '../types';
 import type { Mapping } from '../services/api';
-import { UdpInfoSection, getUdpProperties, sanitizeName } from './UdpInfoSection';
+import { UdpInfoSection } from './UdpInfoSection';
+import { getUdpProperties, sanitizeName } from '../utils/udp';
 
 interface DeviceCardProps {
   device: Light;

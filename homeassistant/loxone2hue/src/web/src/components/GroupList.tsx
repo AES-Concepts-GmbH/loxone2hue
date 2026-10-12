@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Group, Scene } from '../types';
 import type { Mapping } from '../services/api';
 import { Home, Layers, Power, Play, Radio } from 'lucide-react';
-import { UdpInfoSection, getGroupUdpProperties, sanitizeName } from './UdpInfoSection';
+import { UdpInfoSection } from './UdpInfoSection';
+import { getGroupUdpProperties, sanitizeName } from '../utils/udp';
 
 interface GroupListProps {
   groups: Group[];

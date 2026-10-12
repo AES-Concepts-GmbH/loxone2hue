@@ -339,8 +339,8 @@ func (h *Handlers) RestoreBackup(w http.ResponseWriter, r *http.Request) {
 
 	log.Info().Str("id", id).Str("remark", backup.Remark).Msg("Configuration restored from backup")
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
-		"status":  "restored",
-		"backup":  backup.ID,
-		"remark":  backup.Remark,
+		"status": "restored",
+		"backup": backup.ID,
+		"remark": backup.Remark,
 	})
 }
