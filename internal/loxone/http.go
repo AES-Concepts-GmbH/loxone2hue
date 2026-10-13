@@ -20,6 +20,8 @@ type httpTarget struct {
 	password string
 	sendAll  bool
 	name     string
+	// verifyTLS selects the client that checks the Miniserver's certificate.
+	verifyTLS bool
 	// downUntil is set after a failed request. Until it passes, further
 	// updates to this target are skipped instead of each waiting for the
 	// timeout, so one unreachable Miniserver cannot stall the feedback queue.
@@ -33,21 +35,31 @@ const httpBackoff = 10 * time.Second
 // HTTPSender sends status updates to one or more Loxone Miniservers via HTTP
 type HTTPSender struct {
 	targets map[string]*httpTarget // key = MiniserverConfig.ID
-	client  *http.Client
-	mu      sync.Mutex
+	// client accepts any certificate (Miniservers use self-signed ones);
+	// verifyingClient is used for targets with http_verify_tls set.
+	client          *http.Client
+	verifyingClient *http.Client
+	mu              sync.Mutex
 }
+
+// httpTimeout bounds every feedback request. Feedback is fire-and-forget; a
+// Miniserver that does not answer within this window is treated as
+// unreachable (see sendHTTP).
+const httpTimeout = 2 * time.Second
 
 // NewHTTPSender creates a new HTTP sender
 func NewHTTPSender() *HTTPSender {
 	return &HTTPSender{
 		targets: make(map[string]*httpTarget),
 		client: &http.Client{
-			// Feedback is fire-and-forget; a Miniserver that does not answer
-			// within this window is treated as unreachable (see sendHTTP).
-			Timeout: 2 * time.Second,
+			Timeout: httpTimeout,
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
+		},
+		verifyingClient: &http.Client{
+			Timeout:   httpTimeout,
+			Transport: &http.Transport{},
 		},
 	}
 }
@@ -74,14 +86,16 @@ func (s *HTTPSender) Configure(miniservers []config.MiniserverConfig) {
 		}
 
 		s.targets[ms.ID] = &httpTarget{
-			baseURL:  baseURL,
-			user:     ms.HTTPUser,
-			password: ms.HTTPPassword,
-			sendAll:  ms.SendAll,
-			name:     ms.Name,
+			baseURL:   baseURL,
+			user:      ms.HTTPUser,
+			password:  ms.HTTPPassword,
+			sendAll:   ms.SendAll,
+			name:      ms.Name,
+			verifyTLS: ms.HTTPVerifyTLS,
 		}
 
-		log.Info().Str("id", ms.ID).Str("name", ms.Name).Str("url", baseURL).Msg("HTTP feedback configured for miniserver")
+		log.Info().Str("id", ms.ID).Str("name", ms.Name).Str("url", baseURL).Bool("verify_tls", ms.HTTPVerifyTLS).
+			Msg("HTTP feedback configured for miniserver")
 	}
 }
 
@@ -111,6 +125,7 @@ func (s *HTTPSender) Close() {
 	s.mu.Unlock()
 
 	s.client.CloseIdleConnections()
+	s.verifyingClient.CloseIdleConnections()
 }
 
 // Send sends a single property update to a specific Miniserver via HTTP.
@@ -171,7 +186,11 @@ func (s *HTTPSender) sendHTTP(t *httpTarget, loxoneID, property string, value in
 		req.SetBasicAuth(t.user, t.password)
 	}
 
-	resp, err := s.client.Do(req)
+	client := s.client
+	if t.verifyTLS {
+		client = s.verifyingClient
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		s.mu.Lock()
 		t.downUntil = time.Now().Add(httpBackoff)

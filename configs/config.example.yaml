@@ -28,8 +28,9 @@ loxone:
   #     udp_enabled: true         # Send status updates via UDP
   #     http_enabled: false       # Send status updates via HTTP (virtual HTTP input)
   #     http_url: ""              # Optional, defaults to http://<ip>
-  #     http_user: ""
+  #     http_user: ""             # Sent as Basic Auth; over http:// this is clear text, use an https URL to encrypt
   #     http_password: ""
+  #     http_verify_tls: false    # Verify the Miniserver certificate for https URLs (off: self-signed)
   #     send_all: false           # Also send updates for unmapped devices
 
 logging:

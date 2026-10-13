@@ -656,6 +656,12 @@ export function LoxoneGuide({ gatewayPort }: LoxoneGuideProps) {
             <p className="text-sm text-gray-400">
               Beispiel: <code className="text-xs">https://192.168.1.7/dev/sps/io/buero_stefan_on/1</code>
             </p>
+            <p className="text-sm text-yellow-400/80 mt-3">
+              Benutzer und Passwort gehen als HTTP Basic Auth mit. Über <code className="text-xs">http://</code> ist
+              das Klartext im lokalen Netz; eine <code className="text-xs">https://</code>-URL verschlüsselt die
+              Übertragung. Das Zertifikat des Miniservers ist selbstsigniert und wird standardmässig nicht geprüft;
+              die Prüfung lässt sich in den Einstellungen einschalten.
+            </p>
           </div>
 
           <div className="bg-gray-900 rounded-lg p-4">

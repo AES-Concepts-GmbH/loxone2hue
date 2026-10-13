@@ -1,7 +1,7 @@
 # Home Assistant Add-on Configuration
 name: "Loxone2HUE Gateway"
 description: "Gateway Service für bidirektionale Kommunikation zwischen Loxone und Philips HUE"
-version: "1.4.3"
+version: "1.4.4"
 slug: "loxone2hue"
 url: "https://github.com/AES-Concepts-GmbH/loxone2hue"
 # Prebuilt per architecture by .github/workflows/addon-image.yml; the tag is

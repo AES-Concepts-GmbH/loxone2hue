@@ -148,6 +148,8 @@ export interface MiniserverConfig {
   http_url: string;
   http_user: string;
   http_password: string;
+  /** Verify the Miniserver certificate when http_url is https (default off: self-signed). */
+  http_verify_tls: boolean;
   send_all: boolean;
 }
 

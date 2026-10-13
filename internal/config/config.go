@@ -44,7 +44,11 @@ type MiniserverConfig struct {
 	HTTPURL      string `yaml:"http_url" json:"http_url"`
 	HTTPUser     string `yaml:"http_user" json:"http_user"`
 	HTTPPassword string `yaml:"http_password" json:"http_password"`
-	SendAll      bool   `yaml:"send_all" json:"send_all"`
+	// HTTPVerifyTLS makes the HTTP sender check the Miniserver's certificate
+	// when http_url is https. Off by default: Miniservers ship self-signed
+	// certificates, and existing installations must keep working.
+	HTTPVerifyTLS bool `yaml:"http_verify_tls,omitempty" json:"http_verify_tls"`
+	SendAll       bool `yaml:"send_all" json:"send_all"`
 }
 
 // LoxoneConfig holds Loxone integration settings

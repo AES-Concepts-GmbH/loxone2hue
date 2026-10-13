@@ -50,6 +50,7 @@ func (s *Server) setupRoutes() {
 	// and before everything else so no handler is reachable unauthenticated.
 	s.router.Use(corsMiddleware)
 	s.router.Use(authMiddleware)
+	s.router.Use(bodyLimitMiddleware)
 	s.router.Use(loggingMiddleware)
 
 	// API routes
@@ -204,6 +205,22 @@ func corsMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
+		next.ServeHTTP(w, r)
+	})
+}
+
+// maxRequestBody caps the size of any request body. The largest legitimate
+// payload is a configuration backup with a few hundred mappings, well under
+// 1 MiB; anything bigger is a mistake or an attempt to exhaust memory.
+const maxRequestBody = 2 << 20
+
+// bodyLimitMiddleware wraps every request body in a MaxBytesReader. Handlers
+// decode through decodeJSON, which turns the resulting error into a 413.
+func bodyLimitMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Body != nil && r.Header.Get("Upgrade") != "websocket" {
+			r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
+		}
 		next.ServeHTTP(w, r)
 	})
 }
