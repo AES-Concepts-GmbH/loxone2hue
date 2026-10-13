@@ -56,24 +56,3 @@ input[type="range"]::-moz-range-thumb {
   cursor: pointer;
   border: none;
 }
-
-/* Color picker styling */
-.react-colorful {
-  width: 100% !important;
-  height: 150px !important;
-}
-
-.react-colorful__saturation {
-  border-radius: 8px 8px 0 0;
-}
-
-.react-colorful__hue {
-  height: 24px;
-  border-radius: 0 0 8px 8px;
-}
-
-.react-colorful__saturation-pointer,
-.react-colorful__hue-pointer {
-  width: 20px;
-  height: 20px;
-}

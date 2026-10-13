@@ -92,7 +92,8 @@ export async function createMapping(mapping: Omit<Mapping, 'id'>): Promise<Mappi
   });
 }
 
-export async function updateMapping(id: string, mapping: Partial<Mapping>): Promise<Mapping> {
+// PUT replaces the whole mapping, so the caller has to send every field.
+export async function updateMapping(id: string, mapping: Mapping): Promise<Mapping> {
   return fetchJSON(`${API_BASE}/mappings/${id}`, {
     method: 'PUT',
     body: JSON.stringify(mapping),
@@ -158,6 +159,10 @@ export interface ConfigResponse {
   server: {
     host: string;
     port: number;
+  };
+  auth: {
+    enabled: boolean;
+    username: string;
   };
   hue: {
     bridge_ip: string;

@@ -465,6 +465,11 @@ func (h *Handlers) UpdateMapping(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !isUsableMapping(update) {
+		errorResponse(w, http.StatusBadRequest, "loxone_id, hue_id and hue_type required")
+		return
+	}
+
 	prev := config.GetMappings()
 	mappings := config.GetMappings()
 	found := false
@@ -473,7 +478,13 @@ func (h *Handlers) UpdateMapping(w http.ResponseWriter, r *http.Request) {
 			update.ID = id
 			mappings[i] = update
 			found = true
-			break
+			continue
+		}
+		// Same check as on create: two mappings with one loxone_id would make
+		// the Loxone command ambiguous and the mapping manager keep only one.
+		if m.LoxoneID == update.LoxoneID {
+			errorResponse(w, http.StatusConflict, fmt.Sprintf("mapping with loxone_id '%s' already exists", update.LoxoneID))
+			return
 		}
 	}
 

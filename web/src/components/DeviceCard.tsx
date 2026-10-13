@@ -5,6 +5,9 @@ import type { Mapping } from '../services/api';
 import { UdpInfoSection } from './UdpInfoSection';
 import { getUdpProperties, sanitizeName } from '../utils/udp';
 
+// Keys that move a range input; the value is sent once the key is released.
+const SLIDER_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown']);
+
 interface DeviceCardProps {
   device: Light;
   onToggle: (id: string, on: boolean) => void;
@@ -122,6 +125,7 @@ export function DeviceCard({ device, onToggle, onBrightness, mapping, udpSendAll
             onChange={handleBrightnessChange}
             onMouseUp={handleBrightnessCommit}
             onTouchEnd={handleBrightnessCommit}
+            onKeyUp={(e) => { if (SLIDER_KEYS.has(e.key)) handleBrightnessCommit(); }}
             className="w-full"
             disabled={!device.state.reachable || !device.state.on}
           />

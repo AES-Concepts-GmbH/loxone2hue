@@ -36,7 +36,7 @@ export function useHueDevices() {
     }
   }, []);
 
-  const { isConnected, sendCommand } = useWebSocket({ onMessage: handleMessage });
+  const { isConnected } = useWebSocket({ onMessage: handleMessage });
 
   const fetchData = useCallback(async (showLoading = true) => {
     try {
@@ -146,6 +146,5 @@ export function useHueDevices() {
     setLightState,
     setGroupState,
     activateScene,
-    sendCommand,
   };
 }
