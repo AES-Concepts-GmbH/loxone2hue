@@ -482,7 +482,7 @@ export function Dashboard({ authEnabled, onLogout, onAuthChanged }: DashboardPro
             {' '}&bull; Build {BUILD_DATE}
           </div>
           <div className="text-gray-600">
-            &copy; {new Date().getFullYear()} Stefan Beyeler
+            &copy; {new Date().getFullYear()} Stefan Beyeler, AES Concepts GmbH
           </div>
         </div>
       </footer>

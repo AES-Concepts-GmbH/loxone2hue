@@ -20,6 +20,8 @@ Gateway Service für die bidirektionale Kommunikation zwischen Loxone Miniserver
 
 Starte das Add-on und warte, bis es bereit ist.
 
+Das Add-on lädt ein fertiges Image von `ghcr.io/aes-concepts-gmbh/loxone2hue-{arch}`. Bricht die Installation mit einem Pull-Fehler (403/denied) ab, sind die Pakete in der GitHub-Organisation noch nicht auf Public gestellt.
+
 ### 2. HUE Bridge verbinden
 
 1. Öffne die Web UI
