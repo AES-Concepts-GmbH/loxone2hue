@@ -91,6 +91,12 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/config", s.handlers.GetConfig).Methods("GET")
 	api.HandleFunc("/config", s.handlers.UpdateConfig).Methods("PUT")
 
+	// Login: status and login are reachable without credentials (see isAuthExempt)
+	api.HandleFunc("/auth/status", s.handlers.AuthStatus).Methods("GET")
+	api.HandleFunc("/auth/login", s.handlers.Login).Methods("POST")
+	api.HandleFunc("/auth/logout", s.handlers.Logout).Methods("POST")
+	api.HandleFunc("/auth", s.handlers.UpdateAuth).Methods("PUT")
+
 	// Backup endpoints
 	api.HandleFunc("/backups", s.handlers.ListBackups).Methods("GET")
 	api.HandleFunc("/backups", s.handlers.CreateBackup).Methods("POST")
@@ -146,7 +152,7 @@ func (s *Server) Start(ctx context.Context, host string, port int) error {
 			Str("host", host).
 			Msg("No password configured: the API, the device control and the backup download " +
 				"(which contains the HUE application key) are reachable by anyone on this network. " +
-				"Set auth.password in the configuration to require a login.")
+				"Set a password under Einstellungen > Login-Schutz (or auth.password in the configuration) to require a login.")
 	}
 
 	errChan := make(chan error, 1)

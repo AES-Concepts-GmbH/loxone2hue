@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.0
+
+- Login-Schutz in der Web-UI: Unter Einstellungen > Login-Schutz lassen sich Benutzername und Passwort setzen, aendern und der Login wieder ausschalten (mit Bestaetigung des aktuellen Passworts). Bisher ging das nur durch Editieren der config.yaml
+- Passwort wird als bcrypt-Hash gespeichert (auth.password_hash). Ein in der Datei eingetragenes Klartext-Passwort wird beim ersten Start gehasht und entfernt; Backups enthalten damit kein Passwort mehr
+- Login-Formular in der Web-UI statt des Browser-Dialogs; jede Anmeldung erhaelt eine eigene Session (24 Stunden), Logout-Button im Kopfbereich. API-Clients und Loxone senden weiterhin Basic Auth mit jeder Anfrage; verifizierte Zugangsdaten werden gecacht, damit Loxone-Befehle nicht pro Aufruf den bcrypt-Vergleich zahlen
+- Schutz gegen Durchprobieren: Nach fuenf Fehlversuchen wird die Absenderadresse 30 Sekunden gesperrt, bei weiteren Fehlversuchen jeweils doppelt so lang (hoechstens eine Stunde), Antwort 429 mit Retry-After
+- Ohne Login zeigt die Web-UI dauerhaft einen Warnhinweis mit Link zu den Einstellungen; der Standard bleibt aus, damit bestehende Installationen und Home Assistant Ingress unveraendert laufen
+- Bridge-Verbindungstest und Pairing akzeptieren nur Adressen aus privaten Netzen; das Gateway laesst sich nicht mehr als Sonde fuer beliebige Hosts verwenden
+- API: GET /api/auth/status, POST /api/auth/login, POST /api/auth/logout, PUT /api/auth; in Swagger dokumentiert
+
 ## 1.4.4
 
 - Sicherheit: Request-Bodies sind auf 2 MiB begrenzt (Backup-Upload, Mapping-Import, Konfiguration); groessere Anfragen erhalten 413 statt in den Speicher gelesen zu werden

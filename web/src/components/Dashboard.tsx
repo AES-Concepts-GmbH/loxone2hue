@@ -28,6 +28,8 @@ import {
   Timer,
   ChevronDown,
   Activity,
+  LogOut,
+  ShieldAlert,
 } from 'lucide-react';
 
 // Version info - injected at build time via Vite define
@@ -36,7 +38,15 @@ const BUILD_DATE = __BUILD_DATE__;
 
 type Tab = 'devices' | 'rooms' | 'zones' | 'scenes' | 'sensors' | 'mappings' | 'settings' | 'guide' | 'api';
 
-export function Dashboard() {
+interface DashboardProps {
+  /** Whether the gateway currently requires a login. */
+  authEnabled: boolean;
+  onLogout: () => void;
+  /** Called when the login was enabled, changed or disabled in the settings. */
+  onAuthChanged: (enabled: boolean) => void;
+}
+
+export function Dashboard({ authEnabled, onLogout, onAuthChanged }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<Tab>('guide');
   const [menuOpen, setMenuOpen] = useState(false);
   const [showReleaseNotes, setShowReleaseNotes] = useState(false);
@@ -259,6 +269,16 @@ export function Dashboard() {
                 )}
               </div>
 
+              {authEnabled && (
+                <button
+                  onClick={onLogout}
+                  className="hidden sm:flex items-center gap-1 p-2 text-gray-400 hover:text-white transition-colors"
+                  title="Abmelden"
+                >
+                  <LogOut size={18} />
+                </button>
+              )}
+
               {/* Mobile Menu Toggle */}
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
@@ -324,10 +344,39 @@ export function Dashboard() {
                   )}
                 </button>
               ))}
+              {authEnabled && (
+                <button
+                  onClick={onLogout}
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:bg-gray-700 transition-colors"
+                >
+                  <LogOut size={20} />
+                  Abmelden
+                </button>
+              )}
             </nav>
           )}
         </div>
       </header>
+
+      {/* No login configured: the API, the device control and the backup
+          download (HUE key, Miniserver passwords) are open to the network. */}
+      {!authEnabled && (
+        <div className="bg-yellow-900/30 border-b border-yellow-600/60 px-4 py-2">
+          <div className="max-w-6xl mx-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-yellow-200">
+            <ShieldAlert size={16} className="flex-shrink-0 text-yellow-400" />
+            <span>
+              Kein Login-Schutz: Wer das Gateway im Netzwerk erreicht, kann Lichter steuern und Backups mit dem
+              Hue-Schlüssel herunterladen.
+            </span>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className="underline hover:text-white"
+            >
+              Passwort setzen
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Error Banner */}
       {error && (
@@ -405,7 +454,7 @@ export function Dashboard() {
           />
         )}
 
-        {activeTab === 'settings' && <SettingsPanel />}
+        {activeTab === 'settings' && <SettingsPanel authEnabled={authEnabled} onAuthChanged={onAuthChanged} />}
 
         {activeTab === 'guide' && <LoxoneGuide gatewayPort={serverPort} />}
 

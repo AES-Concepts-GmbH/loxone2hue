@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/AES-Concepts-GmbH/loxone2hue/internal/config"
@@ -107,6 +109,52 @@ func (h *Handlers) Health(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// isPrivateHost reports whether host (an IP, a hostname, optionally with a
+// port) lies in a private, loopback or link-local network. The bridge test
+// and the pairing make the gateway open connections to whatever address the
+// caller supplies; a Hue Bridge is always on the LAN, so anything else is
+// refused rather than letting the gateway probe arbitrary hosts.
+func isPrivateHost(host string) bool {
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	if host == "" {
+		return false
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return isPrivateIP(ip)
+	}
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil || len(addrs) == 0 {
+		return false
+	}
+	for _, a := range addrs {
+		if !isPrivateIP(a.IP) {
+			return false
+		}
+	}
+	return true
+}
+
+func isPrivateIP(ip net.IP) bool {
+	return ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast()
+}
+
+// requirePrivateBridge rejects bridge addresses outside the local network.
+func requirePrivateBridge(w http.ResponseWriter, bridgeIP string) bool {
+	if isPrivateHost(bridgeIP) {
+		return true
+	}
+	errorResponse(w, http.StatusBadRequest, "bridge_ip must be an address in the local network (private IP range)")
+	return false
+}
+
 // TestBridgeConnection tests network connectivity to a HUE bridge
 func (h *Handlers) TestBridgeConnection(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -119,6 +167,9 @@ func (h *Handlers) TestBridgeConnection(w http.ResponseWriter, r *http.Request) 
 
 	if req.BridgeIP == "" {
 		errorResponse(w, http.StatusBadRequest, "bridge_ip required")
+		return
+	}
+	if !requirePrivateBridge(w, req.BridgeIP) {
 		return
 	}
 
@@ -236,6 +287,9 @@ func (h *Handlers) PairBridge(w http.ResponseWriter, r *http.Request) {
 
 	if req.BridgeIP == "" {
 		errorResponse(w, http.StatusBadRequest, "bridge_ip required")
+		return
+	}
+	if !requirePrivateBridge(w, req.BridgeIP) {
 		return
 	}
 

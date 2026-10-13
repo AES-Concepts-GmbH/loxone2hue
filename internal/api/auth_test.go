@@ -9,6 +9,7 @@ import (
 
 	"github.com/AES-Concepts-GmbH/loxone2hue/internal/config"
 	"github.com/gorilla/websocket"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // withAuth configures a password for the duration of a test.
@@ -18,8 +19,14 @@ func withAuth(t *testing.T, username, password string) {
 	if _, err := config.Load(filepath.Join(t.TempDir(), "config.yaml")); err != nil {
 		t.Fatalf("load config: %v", err)
 	}
-	config.UpdateAuth(config.AuthConfig{Username: username, Password: password})
-	t.Cleanup(func() { config.UpdateAuth(config.AuthConfig{}) })
+	config.BcryptCost = bcrypt.MinCost // hashing speed is not under test
+	if err := config.UpdateAuth(config.AuthConfig{Username: username, Password: password}); err != nil {
+		t.Fatalf("update auth: %v", err)
+	}
+	// The limiter and the sessions are process-wide; start every test clean.
+	limiter = newLoginLimiter()
+	sessions.revokeAll()
+	t.Cleanup(func() { _ = config.UpdateAuth(config.AuthConfig{}) })
 }
 
 func protectedHandler() http.Handler {
@@ -73,7 +80,7 @@ func TestAuthRejectsMissingAndWrongCredentials(t *testing.T) {
 	}
 }
 
-func TestAuthAcceptsCorrectCredentialsAndIssuesSession(t *testing.T) {
+func TestAuthAcceptsCorrectCredentialsWithoutIssuingSession(t *testing.T) {
 	withAuth(t, "admin", "geheim")
 
 	req := httptest.NewRequest("GET", "/api/config", nil)
@@ -85,32 +92,12 @@ func TestAuthAcceptsCorrectCredentialsAndIssuesSession(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
-
-	var session *http.Cookie
+	// Loxone authenticates every command with Basic Auth; a session per
+	// request would grow the store without bound.
 	for _, c := range rec.Result().Cookies() {
 		if c.Name == sessionCookieName {
-			session = c
+			t.Error("Basic Auth request was given a session cookie")
 		}
-	}
-	if session == nil {
-		t.Fatal("no session cookie issued")
-	}
-	if !session.HttpOnly {
-		t.Error("session cookie is not HttpOnly")
-	}
-	// SameSite=Strict is what stops a foreign page from driving GET /ws?cmd=.
-	if session.SameSite != http.SameSiteStrictMode {
-		t.Errorf("SameSite = %v, want Strict", session.SameSite)
-	}
-
-	// The cookie alone must authenticate the next request.
-	follow := httptest.NewRequest("GET", "/api/config", nil)
-	follow.AddCookie(session)
-
-	rec2 := httptest.NewRecorder()
-	protectedHandler().ServeHTTP(rec2, follow)
-	if rec2.Code != http.StatusOK {
-		t.Errorf("session cookie was not accepted: status %d", rec2.Code)
 	}
 }
 
@@ -164,8 +151,9 @@ func TestWebSocketAuthentication(t *testing.T) {
 	})
 
 	t.Run("mit Session-Cookie akzeptiert", func(t *testing.T) {
+		token, _ := sessions.create()
 		header := http.Header{}
-		header.Set("Cookie", sessionCookieName+"="+sessionToken)
+		header.Set("Cookie", sessionCookieName+"="+token)
 
 		conn, _, err := websocket.DefaultDialer.Dial(url, header)
 		if err != nil {

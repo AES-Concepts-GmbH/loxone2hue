@@ -3,21 +3,70 @@ export type { Mapping };
 
 const API_BASE = './api';
 
+/**
+ * Fired on window when the API answers 401, so the app can show the login
+ * form instead of every component handling it.
+ */
+export const AUTH_REQUIRED_EVENT = 'loxone2hue:auth-required';
+
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      // Tells the server this is the UI: a 401 then comes without a Basic
+      // Auth challenge, so the browser does not open its own dialog.
+      'X-Requested-With': 'loxone2hue-ui',
       ...options?.headers,
     },
   });
 
   if (!response.ok) {
+    if (response.status === 401 && !url.endsWith('/auth/login')) {
+      window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT));
+    }
     const error = await response.json().catch(() => ({ error: response.statusText }));
     throw new Error(error.error || 'API request failed');
   }
 
   return response.json();
+}
+
+// Login
+export interface AuthStatus {
+  enabled: boolean;
+  username: string;
+  authenticated: boolean;
+}
+
+export async function getAuthStatus(): Promise<AuthStatus> {
+  return fetchJSON(`${API_BASE}/auth/status`);
+}
+
+export async function login(username: string, password: string): Promise<{ status: string; enabled: boolean }> {
+  return fetchJSON(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  });
+}
+
+export async function logout(): Promise<void> {
+  await fetchJSON(`${API_BASE}/auth/logout`, { method: 'POST' });
+}
+
+export interface AuthUpdate {
+  username?: string;
+  current_password?: string;
+  new_password?: string;
+  disable?: boolean;
+}
+
+/** Sets, changes or disables the login; the server issues a fresh session on success. */
+export async function updateAuth(update: AuthUpdate): Promise<{ status: string; enabled: boolean; username?: string }> {
+  return fetchJSON(`${API_BASE}/auth`, {
+    method: 'PUT',
+    body: JSON.stringify(update),
+  });
 }
 
 // Bridge endpoints

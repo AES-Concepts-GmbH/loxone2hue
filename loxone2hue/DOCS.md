@@ -40,7 +40,11 @@ Mappings verbinden Loxone IDs mit HUE Geräten:
    - **HUE Typ**: light, group oder scene
    - **HUE Gerät**: Das zu steuernde Gerät
 
-### 4. Loxone konfigurieren
+### 4. Login-Schutz setzen (empfohlen)
+
+Das Add-on läuft mit `host_network`, die Web-UI und die API sind damit auf Port 8080 im ganzen LAN erreichbar, nicht nur über Ingress. Setze unter **Einstellungen → Login-Schutz** ein Passwort; die Web-UI zeigt bis dahin einen Warnhinweis. Loxone übergibt die Zugangsdaten danach in der Adresse des Virtuellen Ausgangs: `http://admin:<passwort>@<home-assistant-ip>:8080`.
+
+### 5. Loxone konfigurieren
 
 Erstelle in Loxone Config:
 
@@ -151,7 +155,7 @@ Die Mappings können exportiert und importiert werden:
 - Prüfe die Firewall-Einstellungen
 - Stelle sicher, dass Port 8080 erreichbar ist
 - Prüfe die Adresse des Virtuellen Ausgangs (`http://<gateway-ip>:8080`) und teste einen Befehl im Browser: `http://<gateway-ip>:8080/ws?cmd=SET <mapping-id> ON`
-- Bei aktiviertem Login (auth.password) die Zugangsdaten in die Adresse aufnehmen: `http://admin:<passwort>@<gateway-ip>:8080`
+- Bei aktiviertem Login die Zugangsdaten in die Adresse aufnehmen: `http://admin:<passwort>@<gateway-ip>:8080`. Nach fünf Fehlversuchen ist die Adresse 30 Sekunden gesperrt (Antwort 429)
 
 ### Gerät reagiert nicht
 
