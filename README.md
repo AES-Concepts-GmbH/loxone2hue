@@ -114,7 +114,8 @@ server:
 
 auth:
   username: "admin"
-  password: ""            # Leer = kein Login (Standard, nötig für HA-Ingress)
+  password: ""            # Leer = kein Login. Ein hier eingetragenes Passwort wird beim
+                          # ersten Start gehasht (password_hash) und aus der Datei entfernt
 
 hue:
   bridge_ip: ""           # Leer für Auto-Discovery
@@ -143,7 +144,16 @@ mappings: []              # Über die Web-UI konfigurierbar
 
 ### Login-Schutz
 
-Mit gesetztem `auth.password` verlangen Web-UI, API und WebSocket einen Login (HTTP Basic Auth, die Web-UI setzt danach ein Session-Cookie). Loxone-Befehle übergeben die Zugangsdaten in der Adresse des Virtuellen Ausgangs: `http://admin:passwort@gateway-ip:8080`. `GET /api/health` bleibt für den Container-Healthcheck offen. Im Home-Assistant-Add-on ist der Login standardmässig aus, weil Home Assistant den Zugang über Ingress bereits schützt.
+Das Passwort wird unter **Einstellungen → Login-Schutz** gesetzt oder geändert (alternativ `auth.password` in der Konfiguration, das beim nächsten Start durch einen bcrypt-Hash ersetzt wird). Mit gesetztem Passwort verlangen Web-UI, API und WebSocket eine Anmeldung:
+
+- Die Web-UI meldet sich über ein Login-Formular an und erhält ein Session-Cookie (24 Stunden gültig, Logout-Button im Kopfbereich).
+- API-Clients und Loxone senden HTTP Basic Auth; Loxone übergibt die Zugangsdaten in der Adresse des Virtuellen Ausgangs: `http://admin:passwort@gateway-ip:8080`.
+- Nach fünf Fehlversuchen wird die Absenderadresse 30 Sekunden gesperrt, bei weiteren Fehlversuchen jeweils doppelt so lang (höchstens eine Stunde); die Antwort ist dann `429` mit `Retry-After`.
+- `GET /api/health` bleibt für den Container-Healthcheck offen.
+
+Ohne Passwort zeigt die Web-UI dauerhaft einen Warnhinweis: Wer das Gateway im Netzwerk erreicht, kann dann Lichter steuern und Backups mit dem Hue-Schlüssel und den Miniserver-Passwörtern herunterladen. Im Home-Assistant-Add-on ist der Login standardmässig aus, weil Home Assistant den Zugang über Ingress schützt; das Add-on läuft aber mit `host_network`, Port 8080 ist damit im LAN erreichbar, ein Passwort ist auch dort empfohlen.
+
+Der Bridge-Verbindungstest und das Pairing akzeptieren nur Adressen aus privaten Netzen (10.x, 172.16–31.x, 192.168.x, 169.254.x, localhost).
 
 ## Loxone Integration
 

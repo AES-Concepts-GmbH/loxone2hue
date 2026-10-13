@@ -48,6 +48,10 @@ const openAPISpec = `{
       "description": "Service Health Check"
     },
     {
+      "name": "Auth",
+      "description": "Login-Schutz: Status, Anmeldung der Web-UI, Passwort setzen"
+    },
+    {
       "name": "Loxone",
       "description": "Loxone Befehle (HTTP/WebSocket Endpoint)"
     },
@@ -101,6 +105,112 @@ const openAPISpec = `{
     { "sessionCookie": [] }
   ],
   "paths": {
+    "/auth/status": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Login-Status",
+        "description": "Ob ein Login konfiguriert ist und ob der Aufrufer angemeldet ist (Session-Cookie oder Basic Auth). Ohne Anmeldung erreichbar.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "username": { "type": "string", "example": "admin" },
+                    "authenticated": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Anmelden (Web-UI)",
+        "description": "Prüft Benutzername und Passwort und setzt das Session-Cookie loxone2hue_session (24 Stunden, HttpOnly, SameSite=Strict). Nach fünf Fehlversuchen ist die Absenderadresse 30 Sekunden gesperrt, bei weiteren Fehlversuchen jeweils doppelt so lang (höchstens eine Stunde). API-Clients brauchen diesen Endpunkt nicht und senden Basic Auth mit jeder Anfrage.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "password"],
+                "properties": {
+                  "username": { "type": "string", "example": "admin" },
+                  "password": { "type": "string", "format": "password" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Angemeldet, Session-Cookie gesetzt" },
+          "401": { "description": "Benutzername oder Passwort falsch", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "429": { "description": "Adresse gesperrt; Retry-After nennt die Wartezeit in Sekunden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Abmelden",
+        "description": "Macht die Session des Aufrufers ungültig und löscht das Cookie.",
+        "responses": {
+          "200": { "description": "Abgemeldet", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StatusResponse" } } } }
+        }
+      }
+    },
+    "/auth": {
+      "put": {
+        "tags": ["Auth"],
+        "summary": "Login setzen, ändern oder ausschalten",
+        "description": "Setzt Benutzername und Passwort (mindestens 8 Zeichen) oder schaltet den Login mit disable=true aus. Bei aktivem Login muss current_password stimmen (sonst 403, zählt als Fehlversuch). Das Passwort wird als bcrypt-Hash gespeichert. Alle bestehenden Sessions werden beendet; der Aufrufer erhält ein neues Session-Cookie.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": { "type": "string", "description": "Leer = bisheriger Benutzername (Standard admin)" },
+                  "current_password": { "type": "string", "format": "password", "description": "Pflicht, wenn ein Login aktiv ist" },
+                  "new_password": { "type": "string", "format": "password", "minLength": 8 },
+                  "disable": { "type": "boolean", "description": "true schaltet den Login aus" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Gespeichert",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "ok" },
+                    "enabled": { "type": "boolean" },
+                    "username": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Neues Passwort zu kurz", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Aktuelles Passwort falsch", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "429": { "description": "Adresse gesperrt", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": ["Health"],
@@ -1164,13 +1274,13 @@ const openAPISpec = `{
       "basicAuth": {
         "type": "http",
         "scheme": "basic",
-        "description": "Aktiv, sobald in der Konfiguration auth.password gesetzt ist. Ohne Passwort ist die API offen."
+        "description": "Aktiv, sobald ein Login-Passwort gesetzt ist (Einstellungen > Login-Schutz oder auth.password in der Konfiguration, beim Start gehasht). Ohne Passwort ist die API offen. Fünf Fehlversuche sperren die Absenderadresse."
       },
       "sessionCookie": {
         "type": "apiKey",
         "in": "cookie",
         "name": "loxone2hue_session",
-        "description": "Von der Web-UI nach erfolgreichem Login gesetzt."
+        "description": "Von POST /auth/login gesetzt, 24 Stunden gültig, HttpOnly, SameSite=Strict."
       }
     },
     "schemas": {

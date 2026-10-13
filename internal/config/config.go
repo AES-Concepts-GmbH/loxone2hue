@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/subtle"
 	"os"
 	"path/filepath"
 	"sync"
@@ -8,6 +9,7 @@ import (
 	"github.com/AES-Concepts-GmbH/loxone2hue/internal/models"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v3"
 )
 
@@ -63,16 +65,63 @@ type LoggingConfig struct {
 }
 
 // AuthConfig holds the credentials guarding the web UI and API.
-// An empty password disables authentication, which keeps existing
-// installations — and the Home Assistant Ingress setup — working unchanged.
+// No password disables authentication, which keeps existing installations
+// — and the Home Assistant Ingress setup — working unchanged.
+//
+// Password is only ever read from a hand-edited file: Load hashes it into
+// PasswordHash, clears it and writes the file back, so the plain text does
+// not stay on disk or end up in backups. UpdateAuth does the same for a
+// password set through the API.
 type AuthConfig struct {
-	Username string `yaml:"username" json:"username"`
-	Password string `yaml:"password" json:"password"`
+	Username     string `yaml:"username" json:"username"`
+	Password     string `yaml:"password,omitempty" json:"-"`
+	PasswordHash string `yaml:"password_hash,omitempty" json:"-"`
 }
 
 // Enabled reports whether authentication is configured.
 func (a AuthConfig) Enabled() bool {
-	return a.Password != ""
+	return a.PasswordHash != "" || a.Password != ""
+}
+
+// Verify reports whether password matches the stored credential. It accepts
+// the bcrypt hash and, until the first save, a not yet hashed plain text.
+func (a AuthConfig) Verify(password string) bool {
+	if a.PasswordHash != "" {
+		return bcrypt.CompareHashAndPassword([]byte(a.PasswordHash), []byte(password)) == nil
+	}
+	if a.Password != "" {
+		return subtle.ConstantTimeCompare([]byte(a.Password), []byte(password)) == 1
+	}
+	return false
+}
+
+// BcryptCost is the work factor for new password hashes. Cost 10 keeps a
+// verification around 100 ms on a Raspberry Pi; the API caches verified
+// credentials, so Loxone commands pay it once per credential, not per call.
+// Tests lower it to bcrypt.MinCost.
+var BcryptCost = bcrypt.DefaultCost
+
+// HashPassword returns the bcrypt hash stored for a password.
+func HashPassword(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), BcryptCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
+}
+
+// hashPlaintext replaces a plain-text password by its hash, in place.
+func (a *AuthConfig) hashPlaintext() error {
+	if a.Password == "" {
+		return nil
+	}
+	hash, err := HashPassword(a.Password)
+	if err != nil {
+		return err
+	}
+	a.PasswordHash = hash
+	a.Password = ""
+	return nil
 }
 
 // User returns the configured username, defaulting to "admin".
@@ -298,6 +347,20 @@ func Load(path string) (*Config, error) {
 		}
 	}
 
+	// A password typed into the file is hashed on first load and the file
+	// rewritten, so the plain text does not stay on disk. A failed write only
+	// logs: the password still works, it is just hashed again next start.
+	if cfg.Auth.Password != "" {
+		if err := cfg.Auth.hashPlaintext(); err != nil {
+			return nil, err
+		}
+		if err := saveLocked(); err != nil {
+			log.Warn().Err(err).Msg("Login password hashed in memory, but the configuration could not be rewritten")
+		} else {
+			log.Info().Msg("Login password replaced by its hash in the configuration file")
+		}
+	}
+
 	log.Info().Str("path", path).Msg("Configuration loaded")
 	return cfg, nil
 }
@@ -344,7 +407,11 @@ func GetHue() HueConfig {
 func Save() error {
 	mu.Lock()
 	defer mu.Unlock()
+	return saveLocked()
+}
 
+// saveLocked writes the configuration; the caller holds mu.
+func saveLocked() error {
 	if cfgPath == "" {
 		cfgPath = "config.yaml"
 	}
@@ -394,11 +461,18 @@ func GetAuth() AuthConfig {
 	return cfg.Auth
 }
 
-// UpdateAuth replaces the authentication settings.
-func UpdateAuth(auth AuthConfig) {
+// UpdateAuth replaces the authentication settings. A plain-text Password is
+// hashed before it is stored; an AuthConfig without password disables the
+// login.
+func UpdateAuth(auth AuthConfig) error {
+	if err := auth.hashPlaintext(); err != nil {
+		return err
+	}
+
 	mu.Lock()
 	defer mu.Unlock()
 	cfg.Auth = auth
+	return nil
 }
 
 // GetLoxone returns a copy of the Loxone configuration, including passwords.

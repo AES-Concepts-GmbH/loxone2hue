@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Settings, Radio, Globe, Save, CheckCircle, AlertCircle, ScrollText, Search, RefreshCw, Plus, Trash2, Download, Upload, RotateCcw, Archive, Clock } from 'lucide-react';
+import { Settings, Radio, Globe, Save, CheckCircle, AlertCircle, ScrollText, Search, RefreshCw, Plus, Trash2, Download, Upload, RotateCcw, Archive, Clock, ShieldCheck, ShieldOff } from 'lucide-react';
 import * as api from '../services/api';
 import type { MiniserverConfig, LoxoneConfig, LogEntry, ConfigBackup, BackupSummary } from '../services/api';
 
@@ -41,10 +41,23 @@ function generateId(): string {
   return crypto.randomUUID?.() ?? Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-export function SettingsPanel() {
+interface SettingsPanelProps {
+  authEnabled: boolean;
+  onAuthChanged: (enabled: boolean) => void;
+}
+
+export function SettingsPanel({ authEnabled, onAuthChanged }: SettingsPanelProps) {
   const [loxoneConfig, setLoxoneConfig] = useState<LoxoneConfig>({
     miniservers: [],
   });
+
+  // Login-Schutz
+  const [authUsername, setAuthUsername] = useState('admin');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newPasswordRepeat, setNewPasswordRepeat] = useState('');
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authMessage, setAuthMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<'success' | 'error' | null>(null);
   const [loading, setLoading] = useState(true);
@@ -113,6 +126,7 @@ export function SettingsPanel() {
   const loadConfig = async () => {
     try {
       const config = await api.getConfig();
+      if (config.auth?.username) setAuthUsername(config.auth.username);
       setLoxoneConfig({
         miniservers: config.loxone?.miniservers || [],
       });
@@ -250,6 +264,56 @@ export function SettingsPanel() {
     }));
   };
 
+
+  const passwordsMismatch = newPassword !== '' && newPasswordRepeat !== '' && newPassword !== newPasswordRepeat;
+
+  const saveAuth = async () => {
+    if (authBusy) return;
+    if (newPassword.length < 8) {
+      setAuthMessage({ type: 'error', text: 'Das neue Passwort braucht mindestens 8 Zeichen.' });
+      return;
+    }
+    if (newPassword !== newPasswordRepeat) {
+      setAuthMessage({ type: 'error', text: 'Die Passwörter stimmen nicht überein.' });
+      return;
+    }
+    setAuthBusy(true);
+    setAuthMessage(null);
+    try {
+      const result = await api.updateAuth({
+        username: authUsername.trim() || 'admin',
+        current_password: authEnabled ? currentPassword : undefined,
+        new_password: newPassword,
+      });
+      setCurrentPassword('');
+      setNewPassword('');
+      setNewPasswordRepeat('');
+      setAuthMessage({ type: 'success', text: authEnabled ? 'Passwort geändert.' : 'Login-Schutz aktiviert.' });
+      onAuthChanged(result.enabled);
+    } catch (err) {
+      setAuthMessage({ type: 'error', text: err instanceof Error ? err.message : 'Speichern fehlgeschlagen' });
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const disableAuth = async () => {
+    if (authBusy) return;
+    if (!confirm('Login-Schutz wirklich ausschalten? Web-UI, API und Backups sind dann ohne Passwort erreichbar.')) return;
+    setAuthBusy(true);
+    setAuthMessage(null);
+    try {
+      await api.updateAuth({ current_password: currentPassword, disable: true });
+      setCurrentPassword('');
+      setAuthMessage({ type: 'success', text: 'Login-Schutz ausgeschaltet.' });
+      onAuthChanged(false);
+    } catch (err) {
+      setAuthMessage({ type: 'error', text: err instanceof Error ? err.message : 'Ausschalten fehlgeschlagen' });
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
   if (loading) {
     return <div className="text-gray-400 text-center py-12">Lade Konfiguration...</div>;
   }
@@ -261,6 +325,95 @@ export function SettingsPanel() {
       <div className="flex items-center gap-3 mb-6">
         <Settings size={24} className="text-hue-orange" />
         <h2 className="text-xl font-semibold text-white">Einstellungen</h2>
+      </div>
+
+      {/* Login-Schutz */}
+      <div className="bg-gray-800 rounded-xl p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium text-white">Login-Schutz</h3>
+          <span className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full ${authEnabled ? 'bg-green-900/40 text-green-300' : 'bg-yellow-900/40 text-yellow-300'}`}>
+            {authEnabled ? <ShieldCheck size={14} /> : <ShieldOff size={14} />}
+            {authEnabled ? 'Aktiv' : 'Aus'}
+          </span>
+        </div>
+        <p className="text-sm text-gray-400">
+          Mit Passwort verlangen Web-UI, API und WebSocket eine Anmeldung. Loxone übergibt die Zugangsdaten in der
+          Adresse des Virtuellen Ausgangs (<code className="text-xs">http://benutzer:passwort@gateway:port</code>).
+          Das Passwort wird nur als Hash gespeichert.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Benutzername</label>
+            <input
+              type="text"
+              autoComplete="username"
+              value={authUsername}
+              onChange={(e) => setAuthUsername(e.target.value)}
+              className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-hue-orange focus:outline-none placeholder-gray-500 text-sm"
+            />
+          </div>
+          {authEnabled && (
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Aktuelles Passwort</label>
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-hue-orange focus:outline-none placeholder-gray-500 text-sm"
+              />
+            </div>
+          )}
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Neues Passwort (min. 8 Zeichen)</label>
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-hue-orange focus:outline-none placeholder-gray-500 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Neues Passwort wiederholen</label>
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={newPasswordRepeat}
+              onChange={(e) => setNewPasswordRepeat(e.target.value)}
+              className={`w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-hue-orange focus:outline-none placeholder-gray-500 text-sm ${passwordsMismatch ? 'border-red-500' : ''}`}
+            />
+          </div>
+        </div>
+
+        {authMessage && (
+          <div className={`flex items-center gap-2 text-sm ${authMessage.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
+            {authMessage.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+            {authMessage.text}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={saveAuth}
+            disabled={authBusy || !newPassword || (authEnabled && !currentPassword)}
+            className="flex items-center gap-2 bg-hue-orange hover:bg-orange-400 text-gray-900 font-medium px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save size={16} />
+            {authEnabled ? 'Passwort ändern' : 'Login-Schutz aktivieren'}
+          </button>
+          {authEnabled && (
+            <button
+              onClick={disableAuth}
+              disabled={authBusy || !currentPassword}
+              className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-gray-200 px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ShieldOff size={16} />
+              Login-Schutz ausschalten
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Loxone Miniserver Section */}
