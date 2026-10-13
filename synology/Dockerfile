@@ -16,11 +16,12 @@ ARG TARGETARCH=amd64
 WORKDIR /build
 RUN apk add --no-cache git ca-certificates
 
-# Copy source code
-COPY . .
+# Dependencies first, pinned by go.sum
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
 
-# Regenerate go.sum and download dependencies
-RUN rm -f go.sum && go mod tidy
+COPY cmd ./cmd
+COPY internal ./internal
 
 # Build for target architecture with version info
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \

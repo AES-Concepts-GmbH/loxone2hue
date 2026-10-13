@@ -1,0 +1,13 @@
+# Build context for all Dockerfiles is the repository root. Keep everything
+# out that the images do not need; the live config and backups hold secrets.
+.git
+.github
+.claude
+**/node_modules
+web/dist
+configs/config.yaml
+configs/backups
+*.tar
+*.md
+!loxone2hue/DOCS.md
+synology/*.tar

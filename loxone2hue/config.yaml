@@ -3,7 +3,10 @@ name: "Loxone2HUE Gateway"
 description: "Gateway Service für bidirektionale Kommunikation zwischen Loxone und Philips HUE"
 version: "1.3.3"
 slug: "loxone2hue"
-url: "https://github.com/stefanbeyeler/Loxone2HUE"
+url: "https://github.com/AES-Concepts-GmbH/loxone2hue"
+# Prebuilt per architecture by .github/workflows/addon-image.yml; the tag is
+# the version above. Home Assistant pulls this instead of building locally.
+image: "ghcr.io/aes-concepts-gmbh/loxone2hue-{arch}"
 arch:
   - aarch64
   - amd64

@@ -62,30 +62,41 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
 
-  addon-sync:
-    name: Add-on-Quellbäume synchron
+  versions:
+    name: Versionsstände konsistent
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # Die Add-ons tragen eine Kopie des Quellbaums (sync-addons.sh). Ein
-      # Commit, der nur den Root-Baum aendert, liefert ein veraltetes Add-on.
-      - name: Kopien mit Root-Quellbaum vergleichen
+      # Home Assistant pulls ghcr.io/.../loxone2hue-{arch}:<config.yaml version>,
+      # so VERSION, the add-on config and the Web UI must agree.
+      - name: VERSION, loxone2hue/config.yaml und web/package.json vergleichen
         run: |
-          status=0
-          for target in loxone2hue/src homeassistant/loxone2hue/src; do
-            for dir in cmd internal web/src; do
-              if ! diff -rq "$dir" "$target/$dir" >/dev/null; then
-                echo "::error::$target/$dir weicht vom Root-Quellbaum ab (sync-addons.sh ausfuehren)"
-                diff -rq "$dir" "$target/$dir" || true
-                status=1
-              fi
-            done
-            for f in go.mod go.sum VERSION web/package.json web/package-lock.json; do
-              if ! cmp -s "$f" "$target/$f"; then
-                echo "::error::$target/$f weicht vom Root ab (sync-addons.sh ausfuehren)"
-                status=1
-              fi
-            done
-          done
-          exit $status
+          version="$(tr -d '[:space:]' < VERSION)"
+          addon="$(sed -n 's/^version: *"\(.*\)"/\1/p' loxone2hue/config.yaml)"
+          web="$(sed -n 's/^  "version": *"\(.*\)",/\1/p' web/package.json)"
+          echo "VERSION=$version config.yaml=$addon package.json=$web"
+          if [ "$version" != "$addon" ] || [ "$version" != "$web" ]; then
+            echo "::error::Versionsstände weichen ab"
+            exit 1
+          fi
+
+  addon-image:
+    name: Add-on-Image baut (amd64, ohne Push)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: loxone2hue/Dockerfile
+          platforms: linux/amd64
+          push: false
+          build-args: |
+            BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.22
+            BUILD_ARCH=amd64
+            BUILD_VERSION=ci
+            BUILD_DATE=ci
+          cache-from: type=gha,scope=addon-amd64

@@ -2,6 +2,12 @@
 
 ## 1.3.3
 
+- Home-Assistant-Add-on wird als vorgebautes Image ausgeliefert (ghcr.io/aes-concepts-gmbh/loxone2hue-{arch}, Tag = Version). Die GitHub-Action addon-image.yml baut amd64, aarch64 und armv7 bei jedem Push auf main und bei Tags v<version>. Home Assistant laedt das Image statt auf dem Host zu bauen; Installation und Updates werden dadurch deutlich schneller
+- Nur noch ein Add-on-Verzeichnis (loxone2hue/) und kein kopierter Quellbaum mehr: homeassistant/, loxone2hue/src und sync-addons.sh sind entfernt, die Add-on-Metadaten koennen nicht mehr auseinanderlaufen
+- Reproduzierbare Builds: alle Dockerfiles laden Go-Module ueber go.sum (go mod download && go mod verify) statt go.sum im Build zu verwerfen; das Root-Dockerfile nutzt npm ci statt npm install und setzt die Version ins Binary (-X main.version), Backups und Logs zeigen damit nicht mehr "dev"
+- .dockerignore im Root: .git, node_modules, Live-Konfiguration und Backups gelangen nicht mehr in den Build-Kontext
+- Add-on-Dockerfile nutzt TARGETARCH/TARGETVARIANT von buildx fuer alle drei Architekturen (vorher Fallback auf arm64)
+- Add-on-URL und repository.json zeigen auf das tatsaechliche Repository (AES-Concepts-GmbH/loxone2hue)
 - API: Konfigurationszugriffe laufen ueber kopierende Getter (config.Snapshot, GetHue, GetServer, GetLoxone); der Zugriff auf das geteilte Config-Objekt ohne Lock ist entfernt. Lichter, Gruppen und Sensoren aus dem Hue-Cache werden als Kopien herausgegeben, damit API-Antworten nicht mit Event-Updates um dieselben Objekte konkurrieren
 - Befehle ueber GET /ws?cmd= und ueber WebSocket laufen durch eine gemeinsame Ausfuehrung. Dadurch: SET auf ein Szenen- oder Sensor-Mapping meldet einen Fehler statt stillschweigend "ok", eine unbekannte Loxone-ID liefert 404 statt an die Bridge als Licht-ID geschickt zu werden (rohe Hue-UUIDs bleiben erlaubt), und GET <id> STATUS funktioniert jetzt auch ueber HTTP
 - Web-UI: Gruppen schalten laesst die Geraetekarten nicht mehr neu aufbauen (Spinner, zugeklappte UDP-Bereiche, verlorene Slider-Position)
