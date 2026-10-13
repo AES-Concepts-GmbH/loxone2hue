@@ -1,4 +1,5 @@
-import { defineConfig } from 'vite'
+// vitest/config re-exports Vite's defineConfig with the `test` block typed.
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
@@ -24,5 +25,10 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+  },
+  test: {
+    // Pure helper functions only; nothing here needs a DOM.
+    environment: 'node',
+    include: ['src/**/*.test.ts'],
   },
 })

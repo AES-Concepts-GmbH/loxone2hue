@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.1
+
+- Tests fuer die REST-Endpunkte (Bridge-Info, Lichter, Gruppen, Szenen, Sensoren lesen und schalten, Health, Logs, Mapping-Export, Konfiguration speichern, UDP-Test, Pairing, Bridge-Verbindungstest) gegen eine aufzeichnende Fake-Bridge, die WebSocket-Befehlsstrecke (Text- und JSON-Befehle, SCENE, MOOD, STATUS, Fehlerantworten), den Hue-Client (Pairing, Lichter, Gruppen, Szenen, Snapshots) und den Log-Ringpuffer
+- Web-UI: Vitest eingerichtet (npm test, auch im CI), 23 Tests fuer die reinen Hilfsfunktionen (Changelog-Parser, Sensor-Umrechnung, Mood-Helfer, Loxone-Guide-Texte, Loxone-ID-Ableitung, Hue-Ressourcen-Namen)
+
 ## 1.5.0
 
 - Login-Schutz in der Web-UI: Unter Einstellungen > Login-Schutz lassen sich Benutzername und Passwort setzen, aendern und der Login wieder ausschalten (mit Bestaetigung des aktuellen Passworts). Bisher ging das nur durch Editieren der config.yaml
