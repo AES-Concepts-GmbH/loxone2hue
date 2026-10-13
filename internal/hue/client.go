@@ -1011,6 +1011,16 @@ func convertHueSensor(raw json.RawMessage, sensorType string, ownerNames map[str
 		}
 	}
 
+	// Fallback base name when the owning device or room is unknown; the
+	// kind-specific suffix below is appended to it like to any other name.
+	if sensor.Name == "" {
+		shortID := sensor.ID
+		if len(shortID) > 8 {
+			shortID = shortID[:8]
+		}
+		sensor.Name = fmt.Sprintf("Sensor %s", shortID)
+	}
+
 	switch SensorKind(sensorType) {
 	case KindMotion:
 		var m struct {
@@ -1173,15 +1183,6 @@ func convertHueSensor(raw json.RawMessage, sensorType string, ownerNames map[str
 			sensor.State.BatteryState = &dp.PowerState.BatteryState
 			sensor.Name = sensor.Name + " Battery"
 		}
-	}
-
-	// Fallback name if device not found
-	if sensor.Name == "" {
-		shortID := sensor.ID
-		if len(shortID) > 8 {
-			shortID = shortID[:8]
-		}
-		sensor.Name = fmt.Sprintf("Sensor %s", shortID)
 	}
 
 	return sensor

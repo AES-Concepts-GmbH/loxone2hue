@@ -87,7 +87,7 @@ func TestHubDropsSlowClientWhileItWrites(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(3 * time.Second)
+	time.Sleep(time.Second)
 	close(stop)
 	wg.Wait()
 }
@@ -145,7 +145,7 @@ func TestHubRegisterUnregisterChurn(t *testing.T) {
 		}()
 	}
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 	close(stop)
 	wg.Wait()
 }

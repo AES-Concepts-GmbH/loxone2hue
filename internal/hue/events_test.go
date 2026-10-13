@@ -141,19 +141,34 @@ func TestEventStreamBacksOffOnCleanClose(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	// Shorten the production backoff so the test does not have to wait 2s.
+	saved := reconnectDelay
+	reconnectDelay = 100 * time.Millisecond
+	defer func() { reconnectDelay = saved }()
+
 	c := NewClient(strings.TrimPrefix(srv.URL, "https://"), "key")
 	defer c.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go c.RunEventStream(ctx)
+	done := make(chan struct{})
+	go func() {
+		c.RunEventStream(ctx)
+		close(done)
+	}()
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(500 * time.Millisecond)
+	got := atomic.LoadInt64(&conns)
 
-	// With a 5s backoff a single attempt is expected; without any backoff this
-	// counter runs into the thousands.
-	if got := atomic.LoadInt64(&conns); got > 3 {
-		t.Fatalf("reconnected %d times in 2s, expected backoff", got)
+	// Stop the stream before the deferred restore of reconnectDelay, which
+	// RunEventStream reads on every reconnect.
+	cancel()
+	<-done
+
+	// With a 100ms backoff about five attempts are expected; without any
+	// backoff this counter runs into the thousands.
+	if got > 10 {
+		t.Fatalf("reconnected %d times in 500ms, expected backoff", got)
 	}
 }
 
