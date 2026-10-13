@@ -7,6 +7,7 @@ Ein Gateway Service zur bidirektionalen Steuerung von Philips HUE Geräten über
 - **Bidirektionale WebSocket-Kommunikation** zwischen Loxone und HUE
 - **Echtzeit-Status-Updates** via HUE SSE Event Stream
 - **UDP Status-Feedback** — automatische Rückmeldung an Loxone Miniserver per UDP
+- **Sensoren** — Bewegung, Temperatur, Helligkeit, Taster, Kontakt und Batterie, inklusive der von der Bridge pro Raum zusammengefassten Bewegung und Helligkeit (Hue Bridge Pro MotionAware)
 - **Loxone Config Export** — XML-Vorlagen (Virtual UDP Input / Virtual HTTP Output) zum direkten Import
 - **Web-Frontend** zur Visualisierung und Steuerung
 - **Mapping-Konfiguration** für Loxone ↔ HUE Zuordnungen

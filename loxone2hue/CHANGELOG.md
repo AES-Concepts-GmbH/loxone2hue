@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.0
+
+- Raum- und Zuhause-Sensoren: Die von der Bridge pro Raum und fuer das ganze Zuhause zusammengefassten Typen grouped_motion (Bewegung) und grouped_light_level (Helligkeit) erscheinen als Sensoren, lassen sich wie bisher auf Loxone-IDs mappen und melden unter denselben Properties motion bzw. light_level. Auf der Hue Bridge Pro (MotionAware) sind das die Raumwerte ohne separaten Bewegungsmelder; aeltere Bridges ohne diese Typen bleiben unveraendert
+- Neue Feedback-Property lux neben light_level: light_level bleibt der Hue-Rohwert (10000*log10(Lux)+1) fuer bestehende Loxone-Konfigurationen, lux liefert den umgerechneten Wert. Gilt fuer Geraete- und Raum-Helligkeit; die Anleitung beschreibt beide Werte jetzt korrekt (light_level war bisher faelschlich als Lux dokumentiert)
+- Sensoren tragen ein Feld scope (device, room, home); die Web-UI zeigt Raum- und Zuhause-Sensoren mit Kennzeichnung unter dem Raumnamen
+- Bewegungssensoren lesen den Zustand aus motion_report, wenn vorhanden. Neue Firmware liefert das veraltete Feld motion nicht mehr fuer alle Typen, der Zustand waere sonst immer "keine Bewegung"
+- Raumnamen fuer Sensoren werden direkt von der Bridge geholt statt aus dem Gruppen-Cache, der beim ersten Laden der UI noch leer ist
+
 ## 1.3.3
 
 - Home-Assistant-Add-on wird als vorgebautes Image ausgeliefert (ghcr.io/aes-concepts-gmbh/loxone2hue-{arch}, Tag = Version). Die GitHub-Action addon-image.yml baut amd64, aarch64 und armv7 bei jedem Push auf main und bei Tags v<version>. Home Assistant laedt das Image statt auf dem Host zu bauen; Installation und Updates werden dadurch deutlich schneller

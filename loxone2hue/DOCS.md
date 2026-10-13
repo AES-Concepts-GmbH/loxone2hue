@@ -10,6 +10,7 @@ Gateway Service für die bidirektionale Kommunikation zwischen Loxone Miniserver
 - **Szenen**: HUE Szenen über Loxone aktivieren
 - **Echtzeit-Updates**: Bidirektionale Synchronisation via WebSocket
 - **UDP Status-Feedback**: Automatische Status-Rückmeldung an Loxone per UDP
+- **Sensoren**: Bewegung, Temperatur, Helligkeit, Taster, Kontakt, Batterie sowie Raum-Bewegung und Raum-Helligkeit der Bridge (Hue Bridge Pro MotionAware)
 - **Loxone Config Export**: XML-Vorlagen für Virtual UDP Input und Virtual HTTP Output
 - **Web UI**: Übersichtliches Dashboard zur Konfiguration
 

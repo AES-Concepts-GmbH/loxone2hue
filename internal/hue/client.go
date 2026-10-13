@@ -654,6 +654,7 @@ func cloneSensorState(s models.SensorState) models.SensorState {
 	s.Motion = clonePtr(s.Motion)
 	s.Temperature = clonePtr(s.Temperature)
 	s.LightLevel = clonePtr(s.LightLevel)
+	s.Lux = clonePtr(s.Lux)
 	s.ButtonEvent = clonePtr(s.ButtonEvent)
 	s.ControlID = clonePtr(s.ControlID)
 	s.ContactState = clonePtr(s.ContactState)
@@ -686,13 +687,22 @@ func (c *Client) GetGroupName(groupID string) string {
 	return ""
 }
 
-// GetSensors fetches all sensors (motion, temperature, light_level, button, contact, rotary, device_power) from the bridge
-func (c *Client) GetSensors() ([]*models.Sensor, error) {
-	// First build device ID → name mapping via /clip/v2/resource/device
-	deviceNames := make(map[string]string)
-	devResp, err := c.request("GET", "/clip/v2/resource/device", nil)
-	if err == nil {
-		var devResult struct {
+// homeName is the owner name for sensors the bridge aggregates over the
+// whole home (owner rtype bridge_home).
+const homeName = "Zuhause"
+
+// ownerNames maps owner resource IDs (devices and rooms) to their names.
+func (c *Client) ownerNames() map[string]string {
+	names := make(map[string]string)
+	// Rooms are fetched here rather than taken from the group cache: the Web
+	// UI loads sensors and groups in parallel, so at the first call the cache
+	// is usually still empty and room sensors would end up nameless.
+	for _, path := range []string{"/clip/v2/resource/device", "/clip/v2/resource/room"} {
+		resp, err := c.request("GET", path, nil)
+		if err != nil {
+			continue
+		}
+		var result struct {
 			Data []struct {
 				ID       string `json:"id"`
 				Metadata struct {
@@ -700,12 +710,21 @@ func (c *Client) GetSensors() ([]*models.Sensor, error) {
 				} `json:"metadata"`
 			} `json:"data"`
 		}
-		if err := json.Unmarshal(devResp, &devResult); err == nil {
-			for _, d := range devResult.Data {
-				deviceNames[d.ID] = d.Metadata.Name
-			}
+		if err := json.Unmarshal(resp, &result); err != nil {
+			continue
+		}
+		for _, d := range result.Data {
+			names[d.ID] = d.Metadata.Name
 		}
 	}
+	return names
+}
+
+// GetSensors fetches all sensors from the bridge: the per-device types
+// (motion, temperature, light_level, button, contact, rotary, device_power)
+// and the aggregated room/home types (grouped_motion, grouped_light_level).
+func (c *Client) GetSensors() ([]*models.Sensor, error) {
+	ownerNames := c.ownerNames()
 
 	sensors := make([]*models.Sensor, 0)
 
@@ -722,6 +741,10 @@ func (c *Client) GetSensors() ([]*models.Sensor, error) {
 		{"/clip/v2/resource/contact", "contact"},
 		{"/clip/v2/resource/relative_rotary", "relative_rotary"},
 		{"/clip/v2/resource/device_power", "device_power"},
+		// Aggregated per room / home. Older bridges answer 404 here and the
+		// type is skipped like any other missing one.
+		{"/clip/v2/resource/grouped_motion", "grouped_motion"},
+		{"/clip/v2/resource/grouped_light_level", "grouped_light_level"},
 	}
 
 	// Fetch everything before touching the cache. Holding the write lock across
@@ -743,7 +766,7 @@ func (c *Client) GetSensors() ([]*models.Sensor, error) {
 		}
 
 		for _, raw := range result.Data {
-			if sensor := convertHueSensor(raw, ep.sensorType, deviceNames); sensor != nil {
+			if sensor := convertHueSensor(raw, ep.sensorType, ownerNames); sensor != nil {
 				sensors = append(sensors, sensor)
 			}
 		}
@@ -929,7 +952,31 @@ func convertHueScene(hs hueScene) *models.Scene {
 }
 
 // convertHueSensor converts raw JSON sensor data into a Sensor model
-func convertHueSensor(raw json.RawMessage, sensorType string, deviceNames map[string]string) *models.Sensor {
+// sensorNameSuffix is appended to the owner name to tell a device's sensors
+// apart ("Flur Motion", "Flur Temperature"). The aggregated room sensors get
+// German suffixes to match the UI wording for rooms.
+var sensorNameSuffix = map[string]string{
+	"motion":              " Motion",
+	"temperature":         " Temperature",
+	"light_level":         " Light Level",
+	"contact":             " Contact",
+	"grouped_motion":      " Bewegung",
+	"grouped_light_level": " Helligkeit",
+}
+
+// scopeForOwner derives the sensor scope from the owner's resource type.
+func scopeForOwner(rtype string) string {
+	switch rtype {
+	case "room", "zone":
+		return models.ScopeRoom
+	case "bridge_home":
+		return models.ScopeHome
+	default:
+		return models.ScopeDevice
+	}
+}
+
+func convertHueSensor(raw json.RawMessage, sensorType string, ownerNames map[string]string) *models.Sensor {
 	// Common fields present in all sensor types
 	var base struct {
 		ID    string `json:"id"`
@@ -944,8 +991,9 @@ func convertHueSensor(raw json.RawMessage, sensorType string, deviceNames map[st
 	}
 
 	sensor := &models.Sensor{
-		ID:   base.ID,
-		Type: sensorType,
+		ID:    base.ID,
+		Type:  sensorType,
+		Scope: models.ScopeDevice,
 		State: models.SensorState{
 			Enabled: base.Enabled,
 		},
@@ -953,14 +1001,18 @@ func convertHueSensor(raw json.RawMessage, sensorType string, deviceNames map[st
 
 	if base.Owner != nil {
 		sensor.DeviceID = base.Owner.RID
-		if name, ok := deviceNames[base.Owner.RID]; ok {
+		sensor.Scope = scopeForOwner(base.Owner.RType)
+		if name, ok := ownerNames[base.Owner.RID]; ok {
 			sensor.Owner = name
 			sensor.Name = name
+		} else if base.Owner.RType == "bridge_home" {
+			sensor.Owner = homeName
+			sensor.Name = homeName
 		}
 	}
 
-	switch sensorType {
-	case "motion":
+	switch SensorKind(sensorType) {
+	case KindMotion:
 		var m struct {
 			Motion struct {
 				Motion       bool `json:"motion"`
@@ -973,16 +1025,20 @@ func convertHueSensor(raw json.RawMessage, sensorType string, deviceNames map[st
 			Enabled bool `json:"enabled"`
 		}
 		if err := json.Unmarshal(raw, &m); err == nil {
+			// Newer firmware (and the aggregated grouped_motion) only fills
+			// motion_report; the top-level motion flag is legacy and may be
+			// absent, so the report wins when present.
 			motion := m.Motion.Motion
-			sensor.State.Motion = &motion
-			sensor.State.Enabled = m.Enabled
 			if m.Motion.MotionReport != nil {
+				motion = m.Motion.MotionReport.Motion
 				sensor.State.LastUpdated = m.Motion.MotionReport.Changed
 			}
-			sensor.Name = sensor.Name + " Motion"
+			sensor.State.Motion = &motion
+			sensor.State.Enabled = m.Enabled
+			sensor.Name = sensor.Name + sensorNameSuffix[sensorType]
 		}
 
-	case "temperature":
+	case KindTemperature:
 		var t struct {
 			Temperature struct {
 				Temperature       float64 `json:"temperature"`
@@ -1001,10 +1057,10 @@ func convertHueSensor(raw json.RawMessage, sensorType string, deviceNames map[st
 			if t.Temperature.TemperatureReport != nil {
 				sensor.State.LastUpdated = t.Temperature.TemperatureReport.Changed
 			}
-			sensor.Name = sensor.Name + " Temperature"
+			sensor.Name = sensor.Name + sensorNameSuffix[sensorType]
 		}
 
-	case "light_level":
+	case KindLightLevel:
 		var l struct {
 			Light struct {
 				LightLevel       int  `json:"light_level"`
@@ -1018,15 +1074,16 @@ func convertHueSensor(raw json.RawMessage, sensorType string, deviceNames map[st
 		}
 		if err := json.Unmarshal(raw, &l); err == nil {
 			level := l.Light.LightLevel
-			sensor.State.LightLevel = &level
-			sensor.State.Enabled = l.Enabled
 			if l.Light.LightLevelReport != nil {
+				level = l.Light.LightLevelReport.LightLevel
 				sensor.State.LastUpdated = l.Light.LightLevelReport.Changed
 			}
-			sensor.Name = sensor.Name + " Light Level"
+			sensor.State.SetLightLevel(level)
+			sensor.State.Enabled = l.Enabled
+			sensor.Name = sensor.Name + sensorNameSuffix[sensorType]
 		}
 
-	case "button":
+	case KindButton:
 		var b struct {
 			Metadata struct {
 				ControlID int `json:"control_id"`
@@ -1053,7 +1110,7 @@ func convertHueSensor(raw json.RawMessage, sensorType string, deviceNames map[st
 			sensor.Name = fmt.Sprintf("%s Button %d", sensor.Name, controlID)
 		}
 
-	case "contact":
+	case KindContact:
 		var ct struct {
 			ContactReport *struct {
 				Changed string `json:"changed"`
@@ -1067,10 +1124,10 @@ func convertHueSensor(raw json.RawMessage, sensorType string, deviceNames map[st
 				sensor.State.ContactState = &ct.ContactReport.State
 				sensor.State.LastUpdated = ct.ContactReport.Changed
 			}
-			sensor.Name = sensor.Name + " Contact"
+			sensor.Name = sensor.Name + sensorNameSuffix[sensorType]
 		}
 
-	case "relative_rotary":
+	case KindRotary:
 		var rr struct {
 			RelativeRotary struct {
 				RotaryReport *struct {
@@ -1104,7 +1161,7 @@ func convertHueSensor(raw json.RawMessage, sensorType string, deviceNames map[st
 			sensor.Name = sensor.Name + " Rotary"
 		}
 
-	case "device_power":
+	case KindPower:
 		var dp struct {
 			PowerState struct {
 				BatteryLevel int    `json:"battery_level"`

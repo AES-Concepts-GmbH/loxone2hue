@@ -492,8 +492,11 @@ func (h *WebSocketHub) sendSensorFeedback(event hue.Event) {
 			}
 		}
 
-		switch event.Type {
-		case "motion":
+		// Switch on the kind, so the room/home aggregates (grouped_motion,
+		// grouped_light_level) reach Loxone under the same properties as the
+		// per-device sensors.
+		switch hue.SensorKind(event.Type) {
+		case hue.KindMotion:
 			if item.Motion != nil {
 				motion := item.Motion.Motion
 				if item.Motion.MotionReport != nil {
@@ -506,7 +509,7 @@ func (h *WebSocketHub) sendSensorFeedback(event hue.Event) {
 				send("motion", val)
 			}
 
-		case "temperature":
+		case hue.KindTemperature:
 			if item.Temperature != nil {
 				temp := item.Temperature.Temperature
 				if item.Temperature.TemperatureReport != nil {
@@ -515,16 +518,19 @@ func (h *WebSocketHub) sendSensorFeedback(event hue.Event) {
 				send("temperature", fmt.Sprintf("%.1f", temp))
 			}
 
-		case "light_level":
+		case hue.KindLightLevel:
 			if item.LightSensor != nil {
 				level := item.LightSensor.LightLevel
 				if item.LightSensor.LightLevelReport != nil {
 					level = item.LightSensor.LightLevelReport.LightLevel
 				}
+				// light_level is the bridge's raw logarithmic value (kept for
+				// existing Loxone configurations), lux the converted reading.
 				send("light_level", level)
+				send("lux", models.LuxFromLightLevel(level))
 			}
 
-		case "button":
+		case hue.KindButton:
 			if item.Button != nil {
 				event := item.Button.LastEvent
 				if item.Button.ButtonReport != nil {
@@ -538,7 +544,7 @@ func (h *WebSocketHub) sendSensorFeedback(event hue.Event) {
 				}
 			}
 
-		case "contact":
+		case hue.KindContact:
 			if item.ContactReport != nil {
 				val := 0
 				if item.ContactReport.State == "no_contact" {
@@ -547,7 +553,7 @@ func (h *WebSocketHub) sendSensorFeedback(event hue.Event) {
 				send("contact", val)
 			}
 
-		case "relative_rotary":
+		case hue.KindRotary:
 			if item.RelativeRotary != nil && item.RelativeRotary.RotaryReport != nil {
 				steps := item.RelativeRotary.RotaryReport.Rotation.Steps
 				if item.RelativeRotary.RotaryReport.Rotation.Direction == "counter_clockwise" {
@@ -556,7 +562,7 @@ func (h *WebSocketHub) sendSensorFeedback(event hue.Event) {
 				send("rotary", steps)
 			}
 
-		case "device_power":
+		case hue.KindPower:
 			if item.PowerState != nil {
 				send("battery", item.PowerState.BatteryLevel)
 			}

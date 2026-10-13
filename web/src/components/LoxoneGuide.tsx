@@ -760,11 +760,25 @@ export function LoxoneGuide() {
                   <td className="py-2 font-mono text-xs">/dev/sps/io/sensor_bad_temperature/21.5</td>
                 </tr>
                 <tr className="border-b border-gray-700/50">
-                  <td className="py-2 pr-4 text-gray-300">Helligkeit</td>
+                  <td className="py-2 pr-4 text-gray-300">Raum-Bewegung (grouped_motion)</td>
+                  <td className="py-2 pr-4 font-mono text-xs text-hue-orange">motion</td>
+                  <td className="py-2 pr-4">0 / 1, von der Bridge pro Raum zusammengefasst</td>
+                  <td className="py-2 pr-4 font-mono text-xs">wohnzimmer_bewegung/motion:1</td>
+                  <td className="py-2 font-mono text-xs">/dev/sps/io/wohnzimmer_bewegung_motion/1</td>
+                </tr>
+                <tr className="border-b border-gray-700/50">
+                  <td className="py-2 pr-4 text-gray-300">Helligkeit (Rohwert)</td>
                   <td className="py-2 pr-4 font-mono text-xs text-hue-orange">light_level</td>
-                  <td className="py-2 pr-4">0–100000 (Lux)</td>
-                  <td className="py-2 pr-4 font-mono text-xs">sensor_flur/light_level:12500</td>
-                  <td className="py-2 font-mono text-xs">/dev/sps/io/sensor_flur_light_level/12500</td>
+                  <td className="py-2 pr-4">Hue-Rohwert: 10000·log10(Lux)+1</td>
+                  <td className="py-2 pr-4 font-mono text-xs">sensor_flur/light_level:20001</td>
+                  <td className="py-2 font-mono text-xs">/dev/sps/io/sensor_flur_light_level/20001</td>
+                </tr>
+                <tr className="border-b border-gray-700/50">
+                  <td className="py-2 pr-4 text-gray-300">Helligkeit (Lux)</td>
+                  <td className="py-2 pr-4 font-mono text-xs text-hue-orange">lux</td>
+                  <td className="py-2 pr-4">0–100000 (Lux), auch für Raum-Helligkeit</td>
+                  <td className="py-2 pr-4 font-mono text-xs">sensor_flur/lux:100</td>
+                  <td className="py-2 font-mono text-xs">/dev/sps/io/sensor_flur_lux/100</td>
                 </tr>
                 <tr className="border-b border-gray-700/50">
                   <td className="py-2 pr-4 text-gray-300">Taster</td>
