@@ -43,7 +43,7 @@ jobs:
           go-package: ./...
 
   web:
-    name: Web UI (lint, typecheck, build)
+    name: Web UI (lint, typecheck, test, build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -60,6 +60,7 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm test
       - run: npm run build
 
   versions:
