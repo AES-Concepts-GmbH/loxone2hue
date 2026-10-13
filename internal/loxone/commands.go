@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sbeyeler/loxone2hue/internal/models"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/models"
 )
 
 // CommandParser parses Loxone commands

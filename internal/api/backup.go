@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/config"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/models"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog/log"
-	"github.com/sbeyeler/loxone2hue/internal/config"
-	"github.com/sbeyeler/loxone2hue/internal/models"
 )
 
 // ConfigBackup represents a full configuration backup

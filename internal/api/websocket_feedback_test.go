@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/config"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/hue"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/loxone"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/models"
 	"github.com/gorilla/websocket"
-	"github.com/sbeyeler/loxone2hue/internal/config"
-	"github.com/sbeyeler/loxone2hue/internal/hue"
-	"github.com/sbeyeler/loxone2hue/internal/loxone"
-	"github.com/sbeyeler/loxone2hue/internal/models"
 )
 
 // fakeBridge serves the REST resources the client caches plus a one-shot SSE

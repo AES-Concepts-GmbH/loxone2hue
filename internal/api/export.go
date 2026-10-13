@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/sbeyeler/loxone2hue/internal/config"
-	"github.com/sbeyeler/loxone2hue/internal/models"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/config"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/models"
 )
 
 // xmlAttr escapes a string for safe use in an XML attribute value.

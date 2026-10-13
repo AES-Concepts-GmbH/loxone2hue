@@ -8,7 +8,7 @@ Gateway Service für die bidirektionale Kommunikation zwischen Loxone Miniserver
 - **Gerätesteuerung**: Ein/Aus, Helligkeit, Farbe, Farbtemperatur
 - **Gruppen & Zonen**: Räume und Zonen gemeinsam steuern
 - **Szenen**: HUE Szenen über Loxone aktivieren
-- **Echtzeit-Updates**: Bidirektionale Synchronisation via WebSocket
+- **Echtzeit-Updates**: Statusänderungen der Bridge live in der Web UI und als Feedback an Loxone
 - **UDP Status-Feedback**: Automatische Status-Rückmeldung an Loxone per UDP
 - **Sensoren**: Bewegung, Temperatur, Helligkeit, Taster, Kontakt, Batterie sowie Raum-Bewegung und Raum-Helligkeit der Bridge (Hue Bridge Pro MotionAware)
 - **Loxone Config Export**: XML-Vorlagen für Virtual UDP Input und Virtual HTTP Output
@@ -150,7 +150,8 @@ Die Mappings können exportiert und importiert werden:
 
 - Prüfe die Firewall-Einstellungen
 - Stelle sicher, dass Port 8080 erreichbar ist
-- Prüfe die WebSocket-URL im Virtuellen Ausgang
+- Prüfe die Adresse des Virtuellen Ausgangs (`http://<gateway-ip>:8080`) und teste einen Befehl im Browser: `http://<gateway-ip>:8080/ws?cmd=SET <mapping-id> ON`
+- Bei aktiviertem Login (auth.password) die Zugangsdaten in die Adresse aufnehmen: `http://admin:<passwort>@<gateway-ip>:8080`
 
 ### Gerät reagiert nicht
 

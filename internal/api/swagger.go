@@ -4,6 +4,9 @@ import (
 	"embed"
 	"html/template"
 	"net/http"
+	"strings"
+
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/config"
 )
 
 //go:embed swagger-ui.html
@@ -16,9 +19,11 @@ func (s *Server) SwaggerUI(w http.ResponseWriter, r *http.Request) {
 }
 
 // SwaggerSpec serves the OpenAPI specification
+// SwaggerSpec serves the OpenAPI document. The version is filled in from the
+// binary so the spec cannot lag behind a release.
 func (s *Server) SwaggerSpec(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(openAPISpec))
+	w.Write([]byte(strings.Replace(openAPISpec, "__VERSION__", config.GetVersion(), 1)))
 }
 
 const openAPISpec = `{
@@ -77,14 +82,31 @@ const openAPISpec = `{
     {
       "name": "Export",
       "description": "Loxone Config XML-Vorlagen exportieren (Virtual UDP Input, Virtual HTTP Output)"
+    },
+    {
+      "name": "Backups",
+      "description": "Backups der gesamten Konfiguration (Server, HUE, Loxone, Logging, Mappings). Listen und Erstellen liefern nur Metadaten; die vollständige Datei inkl. HUE Application Key und Miniserver-Passwörtern gibt es ausschliesslich über den Download."
+    },
+    {
+      "name": "UDP",
+      "description": "UDP Status-Feedback testen"
+    },
+    {
+      "name": "Logs",
+      "description": "Server-Log (Ringpuffer der letzten Einträge)"
     }
+  ],
+  "security": [
+    { "basicAuth": [] },
+    { "sessionCookie": [] }
   ],
   "paths": {
     "/health": {
       "get": {
         "tags": ["Health"],
         "summary": "Health Check",
-        "description": "Gibt den aktuellen Status des Gateway Services zurück.",
+        "description": "Gibt den aktuellen Status des Gateway Services zurück. Bleibt auch bei aktiviertem Login ohne Anmeldung erreichbar (Container-Healthcheck).",
+        "security": [],
         "responses": {
           "200": {
             "description": "Service ist gesund",
@@ -103,7 +125,7 @@ const openAPISpec = `{
       "get": {
         "tags": ["Loxone"],
         "summary": "Loxone Befehl ausführen (WebSocket)",
-        "description": "Führt einen Loxone-Befehl aus. Dieser Endpoint ist für Loxone Virtual Outputs gedacht.\n\n**Hinweis:** Der WebSocket-Endpoint liegt auf /ws (Root-Ebene, nicht unter /api). Der Pfad /../ws ist relativ zum API-Basispfad /api.\n\n## Verfügbare Befehle\n\n| Befehl | Beschreibung | Beispiel |\n|--------|--------------|----------|\n| SET id ON | Licht/Gruppe einschalten | SET wz_decke ON |\n| SET id OFF | Licht/Gruppe ausschalten | SET wz_decke OFF |\n| SET id BRI n | Helligkeit setzen (0-100%) | SET wz_decke BRI 75 |\n| SET id CT n | Farbtemperatur (2000-6500K) | SET wz_decke CT 4000 |\n| SET id COLOR hex | Farbe setzen | SET wz_decke COLOR #FF5500 |\n| SCENE id | Szene aktivieren | SCENE sz_relax |\n| MOOD id n | Stimmung aktivieren (Lichtsteuerung) | MOOD wohnzimmer 1 |\n| GET id STATUS | Status abfragen | GET wz_decke STATUS |\n\n## MOOD-Befehl für Lichtsteuerungs-Baustein\n\nDer MOOD-Befehl ist für den Loxone Lichtsteuerungs-Baustein konzipiert:\n- MOOD 0: Schaltet die zugehörige Gruppe/Licht aus\n- MOOD 1-9: Aktiviert die entsprechende Szene\n\nBenötigte Mappings für MOOD:\n- target -> Gruppe (für Mood 0 = Aus)\n- target_mood_1 -> Szene (für Mood 1)\n- target_mood_2 -> Szene (für Mood 2)\n- etc.",
+        "description": "Führt einen Loxone-Befehl aus. Dieser Endpoint ist für Loxone Virtual Outputs gedacht.\n\n**Hinweis:** Der WebSocket-Endpoint liegt auf /ws (Root-Ebene, nicht unter /api). Der Pfad /../ws ist relativ zum API-Basispfad /api.\n\n## Verfügbare Befehle\n\n| Befehl | Beschreibung | Beispiel |\n|--------|--------------|----------|\n| SET id ON | Licht/Gruppe einschalten | SET wz_decke ON |\n| SET id OFF | Licht/Gruppe ausschalten | SET wz_decke OFF |\n| SET id BRI n | Helligkeit setzen (0-100%), 0 schaltet aus, >0 schaltet ein | SET wz_decke BRI 75 |\n| SET id CT n | Farbtemperatur (2000-6500K) | SET wz_decke CT 4000 |\n| SET id COLOR hex | Farbe setzen | SET wz_decke COLOR #FF5500 |\n| SCENE id | Szene aktivieren | SCENE sz_relax |\n| MOOD id n | Stimmung aktivieren (Lichtsteuerung) | MOOD wohnzimmer 1 |\n| GET id STATUS | Status abfragen | GET wz_decke STATUS |\n\n## MOOD-Befehl für Lichtsteuerungs-Baustein\n\nDer MOOD-Befehl ist für den Loxone Lichtsteuerungs-Baustein konzipiert:\n- MOOD 0: Schaltet die zugehörige Gruppe/Licht aus\n- MOOD 1-9: Aktiviert die entsprechende Szene\n\nBenötigte Mappings für MOOD:\n- target -> Gruppe (für Mood 0 = Aus)\n- target_mood_1 -> Szene (für Mood 1)\n- target_mood_2 -> Szene (für Mood 2)\n- etc.",
         "parameters": [
           {
             "name": "cmd",
@@ -914,10 +936,286 @@ const openAPISpec = `{
           }
         }
       }
+    },
+    "/backups": {
+      "get": {
+        "tags": ["Backups"],
+        "summary": "Backups auflisten",
+        "description": "Liefert die Metadaten aller gespeicherten Backups, neueste zuerst. Enthält keine Konfigurationsdaten.",
+        "responses": {
+          "200": {
+            "description": "Liste der Backups",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "backups": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/BackupSummary" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Backups"],
+        "summary": "Backup erstellen",
+        "description": "Sichert die aktuelle Konfiguration als Datei im Backup-Verzeichnis.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "remark": { "type": "string", "description": "Bemerkung zum Backup", "example": "vor Umbau" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Backup erstellt",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BackupSummary" }
+              }
+            }
+          },
+          "500": {
+            "description": "Backup-Verzeichnis oder Datei konnte nicht geschrieben werden",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      }
+    },
+    "/backups/upload": {
+      "post": {
+        "tags": ["Backups"],
+        "summary": "Backup-Datei hochladen",
+        "description": "Speichert eine zuvor heruntergeladene Backup-Datei wieder im Backup-Verzeichnis. Die ID wird neu vergeben, wenn sie keine gültige UUID ist.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ConfigBackup" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Backup gespeichert",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BackupSummary" } } }
+          },
+          "400": {
+            "description": "Ungültiges Backup-Format",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      }
+    },
+    "/backups/{id}": {
+      "delete": {
+        "tags": ["Backups"],
+        "summary": "Backup löschen",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Backup gelöscht",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StatusResponse" } } }
+          },
+          "400": { "description": "Ungültige Backup-ID" },
+          "404": { "description": "Backup nicht gefunden" }
+        }
+      }
+    },
+    "/backups/{id}/download": {
+      "get": {
+        "tags": ["Backups"],
+        "summary": "Backup herunterladen",
+        "description": "Liefert die vollständige Backup-Datei als Download. Sie enthält den HUE Application Key und die Miniserver-Passwörter.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Backup-Datei",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConfigBackup" } } }
+          },
+          "400": { "description": "Ungültige Backup-ID" },
+          "404": { "description": "Backup nicht gefunden" }
+        }
+      }
+    },
+    "/backups/{id}/restore": {
+      "post": {
+        "tags": ["Backups"],
+        "summary": "Backup wiederherstellen",
+        "description": "Ersetzt die laufende Konfiguration durch den Inhalt des Backups und speichert sie. HUE-Verbindung, Miniserver und Mappings werden sofort übernommen; Änderungen an server und logging wirken erst nach einem Neustart.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Konfiguration wiederhergestellt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "restored" },
+                    "backup": { "type": "string", "format": "uuid" },
+                    "remark": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Backup nicht gefunden" },
+          "500": { "description": "Konfiguration konnte nicht gespeichert werden" }
+        }
+      }
+    },
+    "/udp/test": {
+      "post": {
+        "tags": ["UDP"],
+        "summary": "Test-UDP-Meldung senden",
+        "description": "Sendet eine einzelne Status-Meldung im Feedback-Format an einen Miniserver, um den Virtuellen UDP-Eingang in Loxone Config zu prüfen. Der Wert wird je Eigenschaft validiert (z. B. on: 0/1, bri: 0-100).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["loxone_id", "property", "miniserver_id"],
+                "properties": {
+                  "loxone_id": { "type": "string", "example": "wz_decke" },
+                  "property": { "type": "string", "example": "bri", "description": "on, bri, ct, color_x, color_y, motion, temperature, light_level, lux, button, contact, rotary, battery" },
+                  "value": { "type": "string", "example": "75" },
+                  "miniserver_id": { "type": "string", "description": "ID des Miniservers aus der Konfiguration" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Meldung gesendet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "sent" },
+                    "message": { "type": "string", "example": "wz_decke/bri:75" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültiger Wert oder UDP für diesen Miniserver nicht aktiv",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      }
+    },
+    "/logs": {
+      "get": {
+        "tags": ["Logs"],
+        "summary": "Server-Log abrufen",
+        "description": "Liefert die letzten Log-Einträge aus dem Ringpuffer des Gateways (Standard: die letzten 100, maximal 1000).",
+        "parameters": [
+          { "name": "level", "in": "query", "schema": { "type": "string", "enum": ["debug", "info", "warn", "error"] }, "description": "Nur Einträge dieses Levels" },
+          { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "Volltextfilter auf die Nachricht" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 100, "maximum": 1000 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Log-Einträge, älteste zuerst",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entries": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/LogEntry" }
+                    },
+                    "total": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
+    "securitySchemes": {
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "Aktiv, sobald in der Konfiguration auth.password gesetzt ist. Ohne Passwort ist die API offen."
+      },
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "loxone2hue_session",
+        "description": "Von der Web-UI nach erfolgreichem Login gesetzt."
+      }
+    },
     "schemas": {
+      "BackupSummary": {
+        "type": "object",
+        "description": "Metadaten eines Backups, ohne Konfigurationsinhalt",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "version": { "type": "string", "description": "Gateway-Version, mit der das Backup erstellt wurde" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "remark": { "type": "string" },
+          "mapping_count": { "type": "integer" },
+          "miniserver_count": { "type": "integer" }
+        }
+      },
+      "ConfigBackup": {
+        "type": "object",
+        "description": "Vollständige Backup-Datei",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "version": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "remark": { "type": "string" },
+          "config": {
+            "type": "object",
+            "properties": {
+              "server": { "type": "object", "properties": { "host": { "type": "string" }, "port": { "type": "integer" } } },
+              "hue": { "type": "object", "properties": { "bridge_ip": { "type": "string" }, "application_key": { "type": "string" } } },
+              "loxone": { "type": "object", "properties": { "miniservers": { "type": "array", "items": { "$ref": "#/components/schemas/MiniserverConfig" } } } },
+              "logging": { "type": "object", "properties": { "level": { "type": "string" }, "format": { "type": "string" } } },
+              "mappings": { "type": "array", "items": { "$ref": "#/components/schemas/Mapping" } }
+            }
+          }
+        }
+      },
+      "LogEntry": {
+        "type": "object",
+        "properties": {
+          "timestamp": { "type": "string", "format": "date-time" },
+          "level": { "type": "string" },
+          "message": { "type": "string" },
+          "source": { "type": "string" },
+          "fields": { "type": "object", "additionalProperties": true }
+        }
+      },
       "HealthResponse": {
         "type": "object",
         "properties": {
@@ -931,6 +1229,14 @@ const openAPISpec = `{
           },
           "hue_configured": {
             "type": "boolean"
+          },
+          "dropped_bridge_events": {
+            "type": "integer",
+            "description": "Bridge-Events, die verworfen wurden, weil der Event-Kanal voll war (seit Start)"
+          },
+          "dropped_feedback": {
+            "type": "integer",
+            "description": "Status-Meldungen an Loxone, die verworfen wurden, weil die Feedback-Warteschlange voll war (seit Start)"
           }
         }
       },

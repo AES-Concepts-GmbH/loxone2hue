@@ -7,10 +7,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/sbeyeler/loxone2hue/internal/config"
-	"github.com/sbeyeler/loxone2hue/internal/hue"
-	"github.com/sbeyeler/loxone2hue/internal/loxone"
-	"github.com/sbeyeler/loxone2hue/internal/models"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/config"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/hue"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/loxone"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/models"
 )
 
 // TestSensorFeedbackForRoomSensors covers the Loxone side of the aggregated

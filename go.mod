@@ -1,4 +1,4 @@
-module github.com/sbeyeler/loxone2hue
+module github.com/AES-Concepts-GmbH/loxone2hue
 
 go 1.27.0
 

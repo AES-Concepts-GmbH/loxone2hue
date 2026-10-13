@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/sbeyeler/loxone2hue/internal/config"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/config"
 )
 
 const sessionCookieName = "loxone2hue_session"

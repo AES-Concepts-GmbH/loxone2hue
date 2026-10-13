@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/models"
 	"github.com/rs/zerolog/log"
-	"github.com/sbeyeler/loxone2hue/internal/models"
 )
 
 // reconnectDelay is how long to wait before re-opening the event stream.

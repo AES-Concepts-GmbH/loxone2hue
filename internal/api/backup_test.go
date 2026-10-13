@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/config"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/models"
 	"github.com/gorilla/mux"
-	"github.com/sbeyeler/loxone2hue/internal/config"
-	"github.com/sbeyeler/loxone2hue/internal/models"
 )
 
 // TestBackupListingHidesSecrets covers the backup tab of the Web UI: it only

@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/models"
 	"github.com/rs/zerolog/log"
-	"github.com/sbeyeler/loxone2hue/internal/models"
 )
 
 // Client represents a HUE Bridge API client

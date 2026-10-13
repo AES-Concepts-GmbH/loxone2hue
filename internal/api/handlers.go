@@ -10,14 +10,14 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/config"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/hue"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/logging"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/loxone"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/models"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog/log"
-	"github.com/sbeyeler/loxone2hue/internal/config"
-	"github.com/sbeyeler/loxone2hue/internal/hue"
-	"github.com/sbeyeler/loxone2hue/internal/logging"
-	"github.com/sbeyeler/loxone2hue/internal/loxone"
-	"github.com/sbeyeler/loxone2hue/internal/models"
 )
 
 // Handlers contains all HTTP handlers
