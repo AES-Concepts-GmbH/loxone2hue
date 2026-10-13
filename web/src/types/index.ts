@@ -109,11 +109,6 @@ export interface DeviceCommand {
   color?: Color;
 }
 
-export interface WebSocketMessage {
-  type: string;
-  payload: unknown;
-}
-
 export interface StatusMessage {
   type: 'status';
   device: string;

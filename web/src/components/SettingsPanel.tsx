@@ -11,7 +11,22 @@ const LEVEL_STYLES: Record<string, string> = {
   FATAL: 'bg-red-800 text-red-200',
 };
 
-const LEVEL_FILTERS = ['Alle', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'UDP'] as const;
+const LEVEL_FILTERS = ['Alle', 'DEBUG', 'INFO', 'WARN', 'ERROR'] as const;
+
+// Every log line about UDP/HTTP feedback to Loxone contains this word
+// ("UDP feedback sent", "Failed to send HTTP feedback", "Feedback queue full").
+const FEEDBACK_SEARCH = 'feedback';
+
+/** React keys for log rows: the same message can repeat within a second, so count duplicates. */
+function logEntryKeys(entries: LogEntry[]): string[] {
+  const seen = new Map<string, number>();
+  return entries.map((entry) => {
+    const base = `${entry.timestamp}|${entry.source}|${entry.level}|${entry.message}`;
+    const n = seen.get(base) ?? 0;
+    seen.set(base, n + 1);
+    return n === 0 ? base : `${base}#${n}`;
+  });
+}
 
 function formatTimestamp(ts: string): string {
   const d = new Date(ts);
@@ -49,9 +64,9 @@ export function SettingsPanel() {
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const [logLevel, setLogLevel] = useState<string>('');
   const [logSearch, setLogSearch] = useState('');
+  const [feedbackOnly, setFeedbackOnly] = useState(false);
   const [logsLoading, setLogsLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const logContainerRef = useRef<HTMLDivElement>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
 
   useEffect(() => {
@@ -62,19 +77,25 @@ export function SettingsPanel() {
   const loadLogs = useCallback(async () => {
     try {
       setLogsLoading(true);
-      const isUDP = logLevel === 'UDP';
+      // The API takes one search term; with the feedback filter active the
+      // free-text search is applied here on top of it.
       const result = await api.getLogs({
-        level: (!isUDP && logLevel) || undefined,
-        search: isUDP ? 'UDP feedback' : logSearch || undefined,
+        level: logLevel || undefined,
+        search: feedbackOnly ? FEEDBACK_SEARCH : logSearch || undefined,
         limit: 200,
       });
-      setLogEntries(result.entries || []);
+      let entries = result.entries || [];
+      if (feedbackOnly && logSearch) {
+        const needle = logSearch.toLowerCase();
+        entries = entries.filter((e) => e.message.toLowerCase().includes(needle));
+      }
+      setLogEntries(entries);
     } catch (err) {
       console.error('Failed to load logs:', err);
     } finally {
       setLogsLoading(false);
     }
-  }, [logLevel, logSearch]);
+  }, [logLevel, logSearch, feedbackOnly]);
 
   useEffect(() => {
     loadLogs();
@@ -231,6 +252,8 @@ export function SettingsPanel() {
   if (loading) {
     return <div className="text-gray-400 text-center py-12">Lade Konfiguration...</div>;
   }
+
+  const rowKeys = logEntryKeys(logEntries);
 
   return (
     <div className="space-y-6">
@@ -637,6 +660,15 @@ export function SettingsPanel() {
               {lvl}
             </button>
           ))}
+          <button
+            onClick={() => setFeedbackOnly((f) => !f)}
+            title="Nur Feedback-Meldungen an Loxone (UDP/HTTP)"
+            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+              feedbackOnly ? 'bg-green-700 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+          >
+            Feedback
+          </button>
 
           <div className="relative flex-1 min-w-[200px]">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
@@ -664,7 +696,6 @@ export function SettingsPanel() {
 
         {/* Log entries */}
         <div
-          ref={logContainerRef}
           className="bg-gray-900 rounded-lg border border-gray-700 overflow-auto max-h-[420px] font-mono text-[13px] leading-relaxed"
         >
           {logsLoading && logEntries.length === 0 ? (
@@ -676,7 +707,7 @@ export function SettingsPanel() {
               <tbody>
                 {logEntries.map((entry, i) => (
                   <tr
-                    key={i}
+                    key={rowKeys[i]}
                     className="border-b border-gray-800/50 last:border-0 hover:bg-gray-800/40"
                   >
                     <td className="px-3 py-1 text-gray-500 whitespace-nowrap align-top">

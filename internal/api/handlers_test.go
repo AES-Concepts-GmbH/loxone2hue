@@ -194,3 +194,52 @@ func TestMappingWritesFailWhenConfigIsNotWritable(t *testing.T) {
 		t.Errorf("config mappings after failed writes = %+v, want the single saved one", got)
 	}
 }
+
+// TestUpdateMappingRejectsDuplicateLoxoneID: create refused a second mapping
+// with the same loxone_id, but update let one be renamed onto another's ID.
+func TestUpdateMappingRejectsDuplicateLoxoneID(t *testing.T) {
+	h := newTestHandlers(t)
+
+	create := func(body string) models.Mapping {
+		rec := httptest.NewRecorder()
+		h.CreateMapping(rec, httptest.NewRequest("POST", "/api/mappings", strings.NewReader(body)))
+		if rec.Code != 201 {
+			t.Fatalf("create status = %d, body %s", rec.Code, rec.Body.String())
+		}
+		var m models.Mapping
+		if err := json.Unmarshal(rec.Body.Bytes(), &m); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		return m
+	}
+	a := create(`{"loxone_id":"wz_decke","hue_id":"1","hue_type":"light"}`)
+	b := create(`{"loxone_id":"wz_stehlampe","hue_id":"2","hue_type":"light"}`)
+
+	update := func(id, body string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest("PUT", "/api/mappings/"+id, strings.NewReader(body))
+		req = mux.SetURLVars(req, map[string]string{"id": id})
+		h.UpdateMapping(rec, req)
+		return rec
+	}
+
+	// Renaming b onto a's ID must fail and leave b untouched.
+	if rec := update(b.ID, `{"loxone_id":"wz_decke","hue_id":"2","hue_type":"light","enabled":true}`); rec.Code != 409 {
+		t.Fatalf("duplicate update status = %d, want 409 (body %s)", rec.Code, rec.Body.String())
+	}
+	for _, m := range config.GetMappings() {
+		if m.ID == b.ID && m.LoxoneID != "wz_stehlampe" {
+			t.Errorf("mapping b was changed to %q despite the conflict", m.LoxoneID)
+		}
+	}
+
+	// Keeping its own ID is not a conflict with itself.
+	if rec := update(a.ID, `{"loxone_id":"wz_decke","hue_id":"1","hue_type":"light","enabled":false,"name":"Decke"}`); rec.Code != 200 {
+		t.Fatalf("self update status = %d, want 200 (body %s)", rec.Code, rec.Body.String())
+	}
+
+	// Required fields are checked on update as on import.
+	if rec := update(a.ID, `{"loxone_id":"","hue_id":"1","hue_type":"light"}`); rec.Code != 400 {
+		t.Fatalf("empty loxone_id status = %d, want 400 (body %s)", rec.Code, rec.Body.String())
+	}
+}

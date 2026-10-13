@@ -1,9 +1,14 @@
 import { BookOpen, Settings, Code, Link2, Terminal, Lightbulb, Home, Play, CheckCircle2, AlertTriangle, Zap, HelpCircle, Layers, Radio, Download } from 'lucide-react';
 
-export function LoxoneGuide() {
+interface LoxoneGuideProps {
+  /** Port the gateway listens on (from the server config); falls back to the page's port. */
+  gatewayPort?: number;
+}
+
+export function LoxoneGuide({ gatewayPort }: LoxoneGuideProps) {
   const gatewayHost = window.location.hostname;
-  const gatewayPort = '8080';
-  const gatewayUrl = `${gatewayHost}:${gatewayPort}`;
+  const port = gatewayPort ?? (window.location.port ? Number(window.location.port) : 8080);
+  const gatewayUrl = `${gatewayHost}:${port}`;
 
   return (
     <div className="space-y-8 max-w-4xl">
@@ -126,7 +131,7 @@ export function LoxoneGuide() {
         <div className="bg-gray-900 rounded-lg p-4 font-mono text-sm text-gray-300 overflow-x-auto">
           <pre>{`┌─────────────────┐  HTTP   ┌─────────────────────────┐  CLIP  ┌───────────────┐
 │     Loxone      │────────►│    Loxone2HUE Gateway   │◄──────►│   HUE Bridge  │
-│   Miniserver    │◄────────│        (Port 8080)      │  SSE   │               │
+│   Miniserver    │◄────────│        (Port ${port})      │  SSE   │               │
 └─────────────────┘UDP/HTTP └─────────────────────────┘        └───────────────┘
                                        │
                   HTTP: Befehle senden  │ WebSocket /ws
@@ -425,33 +430,6 @@ export function LoxoneGuide() {
                 <li>• <strong>Wiederholung</strong>: Auf 0 lassen</li>
                 <li>• <strong>Als Digitalausgang</strong>: Aktiviert für Ein/Aus und Szene, deaktiviert für Analog-Werte (Helligkeit, MOOD, Farbtemperatur)</li>
               </ul>
-            </div>
-          </div>
-
-          <div>
-            <h4 className="font-medium text-white mb-3">2.3 Alternative: WebSocket direkt</h4>
-            <p className="text-sm mb-3">
-              Für Echtzeit-Kommunikation kann der Miniserver auch direkt per WebSocket verbunden werden:
-            </p>
-            <div className="bg-gray-900 rounded-lg p-4 text-sm">
-              <div className="mb-2">
-                <span className="text-gray-400">WebSocket URL:</span>
-                <code className="block bg-gray-800 px-3 py-2 rounded mt-1 font-mono">
-                  ws://{gatewayUrl}/ws
-                </code>
-              </div>
-              <div>
-                <span className="text-gray-400">JSON Befehl senden:</span>
-                <pre className="bg-gray-800 px-3 py-2 rounded mt-1 font-mono overflow-x-auto">{`{
-  "type": "command",
-  "target": "wz_decke",
-  "action": "set",
-  "params": {
-    "on": true,
-    "brightness": 80
-  }
-}`}</pre>
-              </div>
             </div>
           </div>
         </div>
@@ -915,7 +893,7 @@ export function LoxoneGuide() {
               </li>
               <li className="flex items-start gap-2">
                 <HelpCircle size={16} className="text-gray-500 mt-0.5 flex-shrink-0" />
-                <span>Stelle sicher, dass der Gateway-Container läuft (Port 8080 erreichbar)</span>
+                <span>Stelle sicher, dass der Gateway-Container läuft (Port {port} erreichbar)</span>
               </li>
               <li className="flex items-start gap-2">
                 <HelpCircle size={16} className="text-gray-500 mt-0.5 flex-shrink-0" />

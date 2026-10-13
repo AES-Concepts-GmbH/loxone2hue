@@ -89,20 +89,5 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     };
   }, [connect]);
 
-  const sendCommand = useCallback((target: string, action: string, params: Record<string, unknown> = {}) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      const message = {
-        type: 'command',
-        target,
-        action,
-        params,
-      };
-      wsRef.current.send(JSON.stringify(message));
-    }
-  }, []);
-
-  return {
-    isConnected,
-    sendCommand,
-  };
+  return { isConnected };
 }

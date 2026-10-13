@@ -43,6 +43,7 @@ export function Dashboard() {
   const [bridgeIP, setBridgeIP] = useState<string | null>(null);
   const [mappings, setMappings] = useState<Mapping[]>([]);
   const [udpSendAll, setUdpSendAll] = useState(false);
+  const [serverPort, setServerPort] = useState<number | undefined>();
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(10);
   const [showIntervalMenu, setShowIntervalMenu] = useState(false);
   const intervalMenuRef = useRef<HTMLDivElement>(null);
@@ -81,6 +82,7 @@ export function Dashboard() {
         if (config.hue?.bridge_ip) {
           setBridgeIP(config.hue.bridge_ip);
         }
+        setServerPort(config.server?.port);
         setUdpSendAll(
           (config.loxone?.miniservers || []).some(
             (ms) => ms.udp_enabled && ms.send_all
@@ -357,7 +359,7 @@ export function Dashboard() {
             scenes={scenes}
             onToggle={handleGroupToggle}
             onActivateScene={activateScene}
-            title="Räume"
+            kind="room"
             mappings={mappings}
             udpSendAll={udpSendAll}
           />
@@ -369,7 +371,7 @@ export function Dashboard() {
             scenes={scenes}
             onToggle={handleGroupToggle}
             onActivateScene={activateScene}
-            title="Zonen"
+            kind="zone"
             mappings={mappings}
             udpSendAll={udpSendAll}
           />
@@ -405,7 +407,7 @@ export function Dashboard() {
 
         {activeTab === 'settings' && <SettingsPanel />}
 
-        {activeTab === 'guide' && <LoxoneGuide />}
+        {activeTab === 'guide' && <LoxoneGuide gatewayPort={serverPort} />}
 
         {activeTab === 'api' && (
           <div className="bg-gray-800 rounded-xl overflow-hidden h-[calc(100vh-220px)]">
@@ -431,7 +433,7 @@ export function Dashboard() {
             {' '}&bull; Build {BUILD_DATE}
           </div>
           <div className="text-gray-600">
-            &copy; 2026 Stefan Beyeler
+            &copy; {new Date().getFullYear()} Stefan Beyeler
           </div>
         </div>
       </footer>

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.2
+
+- Web-UI: Die Mapping-Seite ist in einzelne Komponenten aufgeteilt (Export-Panel, Import-Dialog, Assistent, Mapping-Zeile mit Inline-Bearbeitung, Mood-Szenen, Loxone-Anleitung); Formularfelder, Ressourcen-Auswahl und Kopier-Button sind nur noch einmal vorhanden statt dreifach kopiert
+- Web-UI: Die automatisch aus dem Namen abgeleitete Loxone-ID verwendet dieselbe Regel wie der XML-Export (Bindestriche werden zu Unterstrichen), damit Assistent und Export dieselbe ID liefern
+- Web-UI: Fehler beim Anlegen, Aendern, Loeschen, Importieren oder Exportieren von Mappings werden in der Oberflaeche angezeigt statt nur in der Browser-Konsole; schlagen beim Mood-Assistenten einzelne Szenen fehl, nennt er sie und bietet das Nachtragen an
+- API: PUT /api/mappings/{id} weist eine Loxone-ID ab, die ein anderes Mapping bereits verwendet (409, wie beim Anlegen), und prueft die Pflichtfelder
+- Web-UI: Server-Log hat einen eigenen Filter "Feedback" fuer die UDP/HTTP-Meldungen an Loxone statt eines Pseudo-Levels; der Filter laesst sich mit Level und Suche kombinieren
+- Web-UI: Loxone-Anleitung zeigt den konfigurierten Gateway-Port statt fest 8080; der Abschnitt zur WebSocket-Anbindung ist entfernt, da der Miniserver keine WebSocket-Verbindung aufbauen kann
+- Web-UI: Helligkeits-Slider sendet auch per Tastatur geaenderte Werte; eigenes Favicon statt des fehlenden vite.svg; Seitensprache de; Jahreszahl im Footer aktuell
+- Web-UI: ungenutzte Abhaengigkeit react-colorful samt CSS, ungenutzte Typen und WebSocket-Sendefunktion entfernt
+
 ## 1.4.1
 
 - Dokumentation: README beschreibt die Loxone-Anbindung korrekt ueber HTTP-GET-Befehle (Virtueller Ausgang) statt ueber eine WebSocket-Adresse, die Loxone nicht aufbauen kann; Architekturdiagramm, Konfigurationsbeispiel (Miniserver-Liste, Login), Befehlsreferenz, Feedback-Formate und API-Tabelle sind vollstaendig

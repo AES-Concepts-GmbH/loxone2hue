@@ -10,12 +10,13 @@ interface GroupListProps {
   scenes: Scene[];
   onToggle: (id: string, on: boolean) => void;
   onActivateScene: (id: string) => void;
-  title?: string;
+  /** Rooms and zones share the component; the kind only changes the empty state. */
+  kind?: 'room' | 'zone';
   mappings?: Mapping[];
   udpSendAll?: boolean;
 }
 
-export function GroupList({ groups, scenes, onToggle, onActivateScene, title, mappings = [], udpSendAll = false }: GroupListProps) {
+export function GroupList({ groups, scenes, onToggle, onActivateScene, kind = 'room', mappings = [], udpSendAll = false }: GroupListProps) {
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [expandedUdp, setExpandedUdp] = useState<string | null>(null);
 
@@ -150,12 +151,12 @@ export function GroupList({ groups, scenes, onToggle, onActivateScene, title, ma
 
       {groups.length === 0 && (
         <div className="text-center py-12">
-          {title === 'Zonen' ? (
+          {kind === 'zone' ? (
             <Layers className="mx-auto text-gray-600 mb-4" size={48} />
           ) : (
             <Home className="mx-auto text-gray-600 mb-4" size={48} />
           )}
-          <p className="text-gray-400">Keine {title || 'Gruppen'} gefunden</p>
+          <p className="text-gray-400">Keine {kind === 'zone' ? 'Zonen' : 'Räume'} gefunden</p>
         </div>
       )}
     </div>
