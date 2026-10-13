@@ -28,6 +28,8 @@ RUN npm ci --no-audit --no-fund
 
 # Copy source code
 COPY web/ ./
+# Release notes are bundled from the add-on changelog (see ReleaseNotes.tsx)
+COPY loxone2hue/CHANGELOG.md /app/loxone2hue/CHANGELOG.md
 
 # Copy VERSION file for build-time injection
 COPY VERSION /tmp/VERSION
