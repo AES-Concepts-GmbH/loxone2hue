@@ -141,8 +141,7 @@ func (h *Handlers) CreateBackup(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Remark string `json:"remark"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		errorResponse(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSON(w, r, &req, "invalid request body") {
 		return
 	}
 
@@ -240,8 +239,7 @@ func (h *Handlers) DownloadBackup(w http.ResponseWriter, r *http.Request) {
 // UploadBackup imports a backup file and stores it persistently
 func (h *Handlers) UploadBackup(w http.ResponseWriter, r *http.Request) {
 	var backup ConfigBackup
-	if err := json.NewDecoder(r.Body).Decode(&backup); err != nil {
-		errorResponse(w, http.StatusBadRequest, "invalid backup file format")
+	if !decodeJSON(w, r, &backup, "invalid backup file format") {
 		return
 	}
 

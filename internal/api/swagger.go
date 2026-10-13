@@ -1788,7 +1788,11 @@ const openAPISpec = `{
           },
           "http_password": {
             "type": "string",
-            "description": "Passwort für HTTP Basic Auth"
+            "description": "Passwort für HTTP Basic Auth. Wird über http:// unverschlüsselt übertragen; für verschlüsselte Übertragung eine https-URL eintragen."
+          },
+          "http_verify_tls": {
+            "type": "boolean",
+            "description": "Bei einer https-URL das Zertifikat des Miniservers prüfen. Standard false, da Miniserver selbstsignierte Zertifikate verwenden."
           },
           "send_all": {
             "type": "boolean",

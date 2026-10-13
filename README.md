@@ -129,8 +129,9 @@ loxone:
       udp_enabled: true   # Status-Feedback per UDP
       http_enabled: false # Status-Feedback per HTTP (Virtueller HTTP-Eingang)
       http_url: ""        # Optional, Standard http://<ip>
-      http_user: ""
+      http_user: ""       # Zugangsdaten gehen über http:// im Klartext; https-URL für Verschlüsselung
       http_password: ""
+      http_verify_tls: false  # Zertifikat des Miniservers bei https prüfen (Standard: aus, selbstsigniert)
       send_all: false     # Auch Geräte ohne Mapping melden
 
 logging:

@@ -3,6 +3,7 @@ package api
 import (
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -39,6 +40,23 @@ func NewHandlers(hueClient *hue.Client, mappingManager *loxone.MappingManager, u
 		udpSender:      udpSender,
 		httpSender:     httpSender,
 	}
+}
+
+// decodeJSON reads a JSON request body into v. It answers 413 when the body
+// exceeded the limit set by bodyLimitMiddleware and 400 (with msg) for
+// anything else that is not valid JSON, and reports whether decoding worked.
+func decodeJSON(w http.ResponseWriter, r *http.Request, v interface{}, msg string) bool {
+	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			errorResponse(w, http.StatusRequestEntityTooLarge,
+				fmt.Sprintf("request body exceeds %d bytes", tooLarge.Limit))
+			return false
+		}
+		errorResponse(w, http.StatusBadRequest, msg)
+		return false
+	}
+	return true
 }
 
 // saveConfig persists the configuration and reports failure to the client.
@@ -95,8 +113,7 @@ func (h *Handlers) TestBridgeConnection(w http.ResponseWriter, r *http.Request) 
 		BridgeIP string `json:"bridge_ip"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		errorResponse(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSON(w, r, &req, "invalid request body") {
 		return
 	}
 
@@ -213,8 +230,7 @@ func (h *Handlers) PairBridge(w http.ResponseWriter, r *http.Request) {
 		BridgeIP string `json:"bridge_ip"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		errorResponse(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSON(w, r, &req, "invalid request body") {
 		return
 	}
 
@@ -284,8 +300,7 @@ func (h *Handlers) SetDevice(w http.ResponseWriter, r *http.Request) {
 	id := vars["id"]
 
 	var cmd models.DeviceCommand
-	if err := json.NewDecoder(r.Body).Decode(&cmd); err != nil {
-		errorResponse(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSON(w, r, &cmd, "invalid request body") {
 		return
 	}
 
@@ -337,8 +352,7 @@ func (h *Handlers) SetGroup(w http.ResponseWriter, r *http.Request) {
 	id := vars["id"]
 
 	var cmd models.DeviceCommand
-	if err := json.NewDecoder(r.Body).Decode(&cmd); err != nil {
-		errorResponse(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSON(w, r, &cmd, "invalid request body") {
 		return
 	}
 
@@ -401,6 +415,11 @@ func (h *Handlers) GetMappings(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) CreateMapping(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			errorResponse(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("request body exceeds %d bytes", tooLarge.Limit))
+			return
+		}
 		errorResponse(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
@@ -460,8 +479,7 @@ func (h *Handlers) UpdateMapping(w http.ResponseWriter, r *http.Request) {
 	id := vars["id"]
 
 	var update models.Mapping
-	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
-		errorResponse(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSON(w, r, &update, "invalid request body") {
 		return
 	}
 
@@ -584,8 +602,7 @@ func (h *Handlers) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		Loxone *config.LoxoneConfig `json:"loxone,omitempty"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
-		errorResponse(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSON(w, r, &update, "invalid request body") {
 		return
 	}
 
@@ -649,8 +666,7 @@ func (h *Handlers) TestUDP(w http.ResponseWriter, r *http.Request) {
 		MiniserverID string `json:"miniserver_id"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		errorResponse(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSON(w, r, &req, "invalid request body") {
 		return
 	}
 
@@ -746,8 +762,7 @@ func (h *Handlers) ImportMappings(w http.ResponseWriter, r *http.Request) {
 		Backup MappingsBackup `json:"backup"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		errorResponse(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSON(w, r, &req, "invalid request body") {
 		return
 	}
 

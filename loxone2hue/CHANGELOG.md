@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.4
+
+- Sicherheit: Request-Bodies sind auf 2 MiB begrenzt (Backup-Upload, Mapping-Import, Konfiguration); groessere Anfragen erhalten 413 statt in den Speicher gelesen zu werden
+- Sicherheit: Neue Miniserver-Option http_verify_tls prueft bei einer https-Feedback-URL das Zertifikat des Miniservers. Standard aus, damit bestehende Installationen mit selbstsigniertem Zertifikat weiterlaufen; in den Einstellungen bei https-URLs als Schalter sichtbar
+- Einstellungen und Loxone-Anleitung weisen darauf hin, dass HTTP-Feedback Benutzer und Passwort ueber http:// unverschluesselt uebertraegt, und empfehlen eine https-URL
+
 ## 1.4.3
 
 - Tests fuer die bisher ungeprueften Kernpfade: Textbefehle von Loxone (SET/GET/SCENE/MOOD samt Fehlerfaellen), UDP- und HTTP-Feedback fuer Lichter und Raeume (Format, Protokollwahl pro Mapping, keine Rueckmeldung fuer Szenen und Mood-Eintraege, send_all mit Geraetename), XML-Export fuer Virtual UDP Input und Virtual HTTP Output (BOM, CRLF, Escaping, Mood-Gruppierung, Gateway-Adresse), Backup anlegen und wiederherstellen (Konfiguration, Mapping-Manager, Bridge-Client, Datei), Ablehnung ungueltiger Backup-IDs, Migration alter Konfigurationsdateien (miniserver_ip/udp_feedback, loxoneid/hueid/huetype) und die Umwandlung aller Sensortypen aus dem Bridge-JSON

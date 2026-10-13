@@ -226,6 +226,7 @@ export function SettingsPanel() {
           http_url: '',
           http_user: '',
           http_password: '',
+          http_verify_tls: false,
           send_all: false,
         },
       ],
@@ -426,6 +427,23 @@ export function SettingsPanel() {
                   <p className="text-xs text-gray-500 mt-1">
                     URL aus der Loxone-Config für virtuelle HTTP-Eingänge. Ohne Angabe wird http://&lt;IP&gt; verwendet.
                   </p>
+                  {ms.http_url.trim().toLowerCase().startsWith('https://') ? (
+                    <label className="flex items-center gap-2 cursor-pointer mt-2">
+                      <input
+                        type="checkbox"
+                        checked={ms.http_verify_tls}
+                        onChange={(e) => updateMiniserver(ms.id, { http_verify_tls: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-600 text-hue-orange focus:ring-hue-orange bg-gray-700"
+                      />
+                      <span className="text-gray-300 text-sm">Zertifikat des Miniservers prüfen</span>
+                      <span className="text-xs text-gray-500">(aus bei selbstsigniertem Zertifikat)</span>
+                    </label>
+                  ) : (
+                    <p className="text-xs text-yellow-400/80 mt-2 flex items-center gap-1">
+                      <AlertCircle size={12} />
+                      Über http:// werden Benutzer und Passwort unverschlüsselt im Netzwerk übertragen.
+                    </p>
+                  )}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
