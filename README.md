@@ -33,7 +33,7 @@ Ein Gateway Service zur bidirektionalen Steuerung von Philips HUE Geräten über
 
 ### Home Assistant Add-on (empfohlen)
 
-Das einfachste Setup ist als Home Assistant Add-on. Das Add-on wird als fertiges Image von GitHub Container Registry geladen (`ghcr.io/aes-concepts-gmbh/loxone2hue-{arch}`), auf dem Home-Assistant-Host wird nichts gebaut.
+Das einfachste Setup ist als Home Assistant Add-on. Das Add-on wird als fertiges Image von GitHub Container Registry geladen (`ghcr.io/aes-concepts-gmbh/loxone2hue-{arch}`), auf dem Home-Assistant-Host wird nichts gebaut. Die drei Pakete (`loxone2hue-amd64`, `loxone2hue-aarch64`, `loxone2hue-armv7`) müssen in den GitHub-Package-Einstellungen auf **Public** stehen, sonst bricht die Installation mit einem Pull-Fehler ab; ein neues Paket legt GitHub standardmässig privat an.
 
 1. **Repository hinzufügen:**
    - Gehe zu **Einstellungen** → **Add-ons** → **Add-on Store**
@@ -299,8 +299,21 @@ Jeder Push und Pull Request läuft durch `gofmt`, `go vet`, Tests mit Race-Detec
 ### Kein Feedback in Loxone
 
 - Unter **Einstellungen** prüfen, ob UDP bzw. HTTP für den Miniserver aktiv ist
-- Server-Log in der Web-UI (Filter UDP) zeigt jede gesendete Meldung
+- Server-Log in der Web-UI (Filter „Feedback“) zeigt jede gesendete Meldung
 - `GET /api/health` zeigt `dropped_feedback`, falls Meldungen verworfen wurden
+
+### Hue Bridge Pro: MotionAware-Daten für die Weiterentwicklung liefern
+
+Die Raum- und Zuhause-Sensoren (`grouped_motion`, `grouped_light_level`) sind unterstützt. Die MotionAware-Konfiguration (Bewegungsbereiche, Komfort- und Sicherheitszonen) ist noch nicht ausgewertet, weil Philips die Felder nicht öffentlich dokumentiert. Wer eine Bridge Pro hat, kann die Antworten exportieren und als Issue anhängen; Bridge-IP und Application Key stehen in der `config.yaml`:
+
+```bash
+for r in motion_area_configuration convenience_area_motion security_area_motion; do
+  curl -sk -H "hue-application-key: <application_key>" \
+    "https://<bridge-ip>/clip/v2/resource/$r" > "$r.json"
+done
+```
+
+Vor dem Versand Namen und IDs bei Bedarf anonymisieren; der Application Key gehört nicht in die Dateien.
 
 ## Lizenz
 

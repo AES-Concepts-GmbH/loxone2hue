@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.2
+
+- LICENSE und Footer der Web-UI nennen Stefan Beyeler und AES Concepts GmbH als Rechteinhaber
+- Dokumentation: Hinweis, dass die GHCR-Pakete der Add-on-Images oeffentlich sein muessen (Pull-Fehler 403 sonst), und Anleitung zum Export der MotionAware-Ressourcen einer Hue Bridge Pro fuer die Weiterentwicklung
+
 ## 1.5.1
 
 - Tests fuer die REST-Endpunkte (Bridge-Info, Lichter, Gruppen, Szenen, Sensoren lesen und schalten, Health, Logs, Mapping-Export, Konfiguration speichern, UDP-Test, Pairing, Bridge-Verbindungstest) gegen eine aufzeichnende Fake-Bridge, die WebSocket-Befehlsstrecke (Text- und JSON-Befehle, SCENE, MOOD, STATUS, Fehlerantworten), den Hue-Client (Pairing, Lichter, Gruppen, Szenen, Snapshots) und den Log-Ringpuffer
