@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.3
+
+- Tests fuer die bisher ungeprueften Kernpfade: Textbefehle von Loxone (SET/GET/SCENE/MOOD samt Fehlerfaellen), UDP- und HTTP-Feedback fuer Lichter und Raeume (Format, Protokollwahl pro Mapping, keine Rueckmeldung fuer Szenen und Mood-Eintraege, send_all mit Geraetename), XML-Export fuer Virtual UDP Input und Virtual HTTP Output (BOM, CRLF, Escaping, Mood-Gruppierung, Gateway-Adresse), Backup anlegen und wiederherstellen (Konfiguration, Mapping-Manager, Bridge-Client, Datei), Ablehnung ungueltiger Backup-IDs, Migration alter Konfigurationsdateien (miniserver_ip/udp_feedback, loxoneid/hueid/huetype) und die Umwandlung aller Sensortypen aus dem Bridge-JSON
+- Sensoren, deren Geraet oder Raum der Bridge-Cache nicht kennt, heissen wieder "Sensor <id>" plus Typ statt nur " Temperature" (vom neuen Test gefunden)
+- Testlaufzeit: Wartezeiten in den Hub- und Event-Stream-Tests von 7 auf 2,5 Sekunden gekuerzt; der Reconnect-Abstand des Event-Streams ist im Test verkuerzbar
+
 ## 1.4.2
 
 - Web-UI: Die Mapping-Seite ist in einzelne Komponenten aufgeteilt (Export-Panel, Import-Dialog, Assistent, Mapping-Zeile mit Inline-Bearbeitung, Mood-Szenen, Loxone-Anleitung); Formularfelder, Ressourcen-Auswahl und Kopier-Button sind nur noch einmal vorhanden statt dreifach kopiert

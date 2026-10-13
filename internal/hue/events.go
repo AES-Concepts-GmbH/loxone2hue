@@ -15,7 +15,8 @@ import (
 )
 
 // reconnectDelay is how long to wait before re-opening the event stream.
-const reconnectDelay = 5 * time.Second
+// A variable so the backoff test can shorten it.
+var reconnectDelay = 5 * time.Second
 
 // RunEventStream supervises the HUE Bridge SSE event stream for the lifetime of
 // ctx. It blocks, so call it in its own goroutine.
