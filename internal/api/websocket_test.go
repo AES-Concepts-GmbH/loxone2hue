@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/hue"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/loxone"
 	"github.com/gorilla/websocket"
-	"github.com/sbeyeler/loxone2hue/internal/hue"
-	"github.com/sbeyeler/loxone2hue/internal/loxone"
 )
 
 func newTestHub() *WebSocketHub {

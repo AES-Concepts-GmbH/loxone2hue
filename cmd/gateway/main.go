@@ -9,13 +9,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/api"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/config"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/hue"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/logging"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/loxone"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/sbeyeler/loxone2hue/internal/api"
-	"github.com/sbeyeler/loxone2hue/internal/config"
-	"github.com/sbeyeler/loxone2hue/internal/hue"
-	"github.com/sbeyeler/loxone2hue/internal/logging"
-	"github.com/sbeyeler/loxone2hue/internal/loxone"
 )
 
 var (

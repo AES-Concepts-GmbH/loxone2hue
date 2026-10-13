@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/config"
 	"github.com/gorilla/websocket"
-	"github.com/sbeyeler/loxone2hue/internal/config"
 )
 
 // withAuth configures a password for the duration of a test.

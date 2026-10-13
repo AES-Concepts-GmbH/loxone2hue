@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/sbeyeler/loxone2hue/internal/models"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/models"
 )
 
 // TestToDeviceCommandAcceptsJSONNumbers pins down the type mismatch between the

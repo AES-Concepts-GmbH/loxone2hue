@@ -6,10 +6,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/sbeyeler/loxone2hue/internal/config"
-	"github.com/sbeyeler/loxone2hue/internal/hue"
-	"github.com/sbeyeler/loxone2hue/internal/loxone"
-	"github.com/sbeyeler/loxone2hue/internal/models"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/config"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/hue"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/loxone"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/models"
 )
 
 // TestHTTPCommandAnswersHonestly covers the shared command executor through

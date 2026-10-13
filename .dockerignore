@@ -10,4 +10,6 @@ configs/backups
 *.tar
 *.md
 !loxone2hue/DOCS.md
+# bundled into the Web UI as release notes
+!loxone2hue/CHANGELOG.md
 synology/*.tar

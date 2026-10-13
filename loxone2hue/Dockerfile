@@ -47,6 +47,9 @@ COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
 COPY web/ ./
+# Release notes are bundled from the add-on changelog (see ReleaseNotes.tsx);
+# resolved relative to src/components it lives at /loxone2hue/CHANGELOG.md.
+COPY loxone2hue/CHANGELOG.md /loxone2hue/CHANGELOG.md
 RUN VITE_APP_VERSION="${BUILD_VERSION}" VITE_BUILD_DATE="${BUILD_DATE}" npm run build
 
 #---------------------------------------------

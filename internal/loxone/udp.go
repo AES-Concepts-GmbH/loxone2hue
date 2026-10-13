@@ -5,8 +5,8 @@ import (
 	"net"
 	"sync"
 
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/config"
 	"github.com/rs/zerolog/log"
-	"github.com/sbeyeler/loxone2hue/internal/config"
 )
 
 // udpTarget represents a single UDP connection to a Miniserver

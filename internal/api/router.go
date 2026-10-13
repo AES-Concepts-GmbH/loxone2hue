@@ -7,11 +7,11 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/config"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/hue"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/loxone"
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog/log"
-	"github.com/sbeyeler/loxone2hue/internal/config"
-	"github.com/sbeyeler/loxone2hue/internal/hue"
-	"github.com/sbeyeler/loxone2hue/internal/loxone"
 )
 
 // Server represents the HTTP/WebSocket server

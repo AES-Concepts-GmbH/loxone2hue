@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/sbeyeler/loxone2hue/internal/models"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/models"
 )
 
 // MappingManager handles Loxone to HUE resource mappings

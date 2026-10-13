@@ -42,6 +42,8 @@ COPY web/package*.json ./
 RUN npm ci --no-audit --no-fund
 
 COPY web/ ./
+# Release notes are bundled from the add-on changelog (see ReleaseNotes.tsx)
+COPY loxone2hue/CHANGELOG.md /loxone2hue/CHANGELOG.md
 
 # Build with version info
 ENV VITE_APP_VERSION=${VERSION}

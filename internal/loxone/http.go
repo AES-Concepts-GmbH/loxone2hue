@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/config"
 	"github.com/rs/zerolog/log"
-	"github.com/sbeyeler/loxone2hue/internal/config"
 )
 
 // httpTarget represents a single HTTP connection to a Miniserver

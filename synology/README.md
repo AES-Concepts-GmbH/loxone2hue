@@ -25,8 +25,8 @@ Standalone Docker-Deployment ohne Home Assistant Abhängigkeiten.
 
 1. **Repository klonen:**
    ```bash
-   git clone https://github.com/stefanbeyeler/Loxone2HUE.git
-   cd Loxone2HUE/synology
+   git clone https://github.com/AES-Concepts-GmbH/loxone2hue.git
+   cd loxone2hue/synology
    ```
 
 2. **Container bauen und starten:**

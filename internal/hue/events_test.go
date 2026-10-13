@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sbeyeler/loxone2hue/internal/models"
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/models"
 )
 
 const testEventPayload = `[{"creationtime":"2024-01-01T00:00:00Z","type":"update",` +

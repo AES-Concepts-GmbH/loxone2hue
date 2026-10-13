@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.1
+
+- Dokumentation: README beschreibt die Loxone-Anbindung korrekt ueber HTTP-GET-Befehle (Virtueller Ausgang) statt ueber eine WebSocket-Adresse, die Loxone nicht aufbauen kann; Architekturdiagramm, Konfigurationsbeispiel (Miniserver-Liste, Login), Befehlsreferenz, Feedback-Formate und API-Tabelle sind vollstaendig
+- Swagger: Backups, UDP-Test und Server-Log dokumentiert, Login-Schema (Basic Auth, Session-Cookie) hinterlegt, Health-Zaehler beschrieben; die Versionsnummer kommt aus dem Binary statt aus dem Quelltext
+- Release Notes in der Web-UI werden aus dem CHANGELOG erzeugt und koennen nicht mehr zurueckfallen (bisher Stand 1.2.3)
+- LICENSE-Datei (MIT) ergaenzt; Go-Modulpfad, Links und Klon-Anleitungen zeigen auf github.com/AES-Concepts-GmbH/loxone2hue statt auf zwei veraltete Repositories
+
 ## 1.4.0
 
 - Raum- und Zuhause-Sensoren: Die von der Bridge pro Raum und fuer das ganze Zuhause zusammengefassten Typen grouped_motion (Bewegung) und grouped_light_level (Helligkeit) erscheinen als Sensoren, lassen sich wie bisher auf Loxone-IDs mappen und melden unter denselben Properties motion bzw. light_level. Auf der Hue Bridge Pro (MotionAware) sind das die Raumwerte ohne separaten Bewegungsmelder; aeltere Bridges ohne diese Typen bleiben unveraendert
