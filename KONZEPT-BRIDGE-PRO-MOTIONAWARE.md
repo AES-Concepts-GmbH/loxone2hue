@@ -1,6 +1,6 @@
 # Konzept: Hue Bridge Pro – Raum-Bewegung und MotionAware
 
-Stand: 13.10.2026 · Status: Entwurf
+Stand: 14.10.2026 · Status: Phase 1 umgesetzt, Phase 2 wartet auf Ereignisdaten (siehe Abschnitt 8)
 
 ## 1. Ausgangslage
 
@@ -32,13 +32,13 @@ Die Ressource `clip` listet 45 Typen. Relevant für dieses Konzept:
 | `grouped_motion` | 2 | Bewegung zusammengefasst pro Raum bzw. für das ganze Zuhause | **nein** |
 | `grouped_light_level` | 2 | Helligkeit zusammengefasst pro Raum bzw. Zuhause | **nein** |
 | `motion_area_candidate` | 12 | Lampen, die sich als MotionAware-Sensor eignen | nein (nur Info) |
-| `motion_area_configuration` | 0 | Eingerichtete MotionAware-Bereiche | **nein** |
-| `convenience_area_motion` | 0 | Bewegungsereignis eines Bereichs (Komfort) | **nein** |
-| `security_area_motion` | 0 | Bewegungsereignis eines Bereichs (Sicherheit) | **nein** |
+| `motion_area_configuration` | 1 (Stand 14.10.) | Eingerichtete MotionAware-Bereiche | **nein** |
+| `convenience_area_motion` | 1 (Stand 14.10.) | Bewegungsereignis eines Bereichs (Komfort) | **nein** |
+| `security_area_motion` | 1 (Stand 14.10.) | Bewegungsereignis eines Bereichs (Sicherheit) | **nein** |
 | `tamper` | 0 | Sabotagemeldung (Secure-Geräte) | nein |
 | `camera_motion` | 0 | Bewegung von Secure-Kameras | nein |
 
-Hinweis: Auf der Test-Bridge ist noch kein MotionAware-Bereich eingerichtet. Die JSON-Struktur von `motion_area_configuration`, `convenience_area_motion` und `security_area_motion` muss deshalb noch an echten Daten verifiziert werden (siehe Abschnitt 7).
+Hinweis: Am 13.10. war noch kein MotionAware-Bereich eingerichtet (Anzahl 0). Am 14.10. wurde der Bereich „Büro Stefan“ angelegt und die Struktur abgefragt (Abschnitt 2.3). Das Bewegungsereignis selbst ist noch nicht erfasst (Abschnitt 8).
 
 ### 2.2 Beispiel `grouped_motion`
 
@@ -55,6 +55,38 @@ Hinweis: Auf der Test-Bridge ist noch kein MotionAware-Bereich eingerichtet. Die
 ```
 
 Der Owner ist entweder ein `room` oder `bridge_home`. Die Struktur des Feldes `motion` entspricht dem bekannten Typ `motion`, die bestehende Auswertung kann also wiederverwendet werden.
+
+### 2.3 Echte Daten des MotionAware-Bereichs „Büro Stefan“
+
+Abfrage vom 14.10.2026, nur lesend, Ruhezustand ohne Bewegung (gekürzt, IDs von Lampen weggelassen):
+
+```json
+// motion_area_configuration
+{ "id": "df0e9044-…", "name": "Büro Stefan", "type": "motion_area_configuration",
+  "group": { "rid": "03091793-…", "rtype": "room" },
+  "participants": [ { "resource": { "rid": "…", "rtype": "motion_area_candidate" },
+                     "status": { "health": "healthy" } } ],   // 4 Lampen
+  "services": [ { "rid": "66e1dbe3-…", "rtype": "convenience_area_motion" },
+                { "rid": "b6c5b664-…", "rtype": "security_area_motion" } ],
+  "health": "healthy", "enabled": true }
+
+// convenience_area_motion  (kein Feld "motion" im Ruhezustand)
+{ "id": "66e1dbe3-…", "type": "convenience_area_motion",
+  "owner": { "rid": "df0e9044-…", "rtype": "motion_area_configuration" },
+  "enabled": true, "sensitivity": { "sensitivity": 2, "sensitivity_max": 4 } }
+
+// security_area_motion  (leeres "motion", enabled=false)
+{ "id": "b6c5b664-…", "type": "security_area_motion",
+  "owner": { "rid": "df0e9044-…", "rtype": "motion_area_configuration" },
+  "enabled": false, "motion": {}, "sensitivity": { "sensitivity": 2, "sensitivity_max": 4 } }
+```
+
+Erkenntnisse:
+
+- Der Owner der beiden Bewegungstypen ist `motion_area_configuration`, der Name steht dort im Feld `name`. Die Namensauflösung aus Abschnitt 4.2 stimmt.
+- `motion_area_configuration.services` verweist auf beide Bewegungsdienste, `group` auf den Raum.
+- Im Ruhezustand fehlt bei `convenience_area_motion` das Feld `motion` ganz, bei `security_area_motion` ist es `{}`. Der Konverter muss ein fehlendes oder leeres `motion` als „unbekannt“ behandeln (nicht als Absturz). Ob der Wert bei der ersten Bewegung nachgeliefert wird, ist offen.
+- `security_area_motion` hat `enabled: false`. Mit `enabled = false` ist der Sensor im Konzept laut Abschnitt 7 zu behandeln.
 
 ## 3. Umfang
 
@@ -151,13 +183,7 @@ Das Enum für `Sensor.type` um die neuen Werte erweitern.
 
 ### 4.7 Code-Kopien
 
-Der Go- und Web-Code liegt dreifach im Repo:
-
-- Root (`internal/`, `web/`)
-- [loxone2hue/src/](loxone2hue/src/)
-- [homeassistant/loxone2hue/src/](homeassistant/loxone2hue/src/)
-
-Änderungen werden im Root gemacht und mit [sync-addons.sh](sync-addons.sh) verteilt.
+Stand 14.10.2026 gibt es nur noch den Code im Root (`internal/`, `web/`). Die früheren Kopien unter `loxone2hue/src/` und `homeassistant/loxone2hue/src/` sowie `sync-addons.sh` existieren nicht mehr. Für das Add-on ist nur [loxone2hue/CHANGELOG.md](loxone2hue/CHANGELOG.md) zu pflegen.
 
 ## 5. Tests
 
@@ -179,8 +205,27 @@ Der Go- und Web-Code liegt dreifach im Repo:
 
 ## 7. Offene Punkte
 
-- **Struktur der MotionAware-Typen:** Felder von `motion_area_configuration`, `convenience_area_motion` und `security_area_motion` an der Bridge Pro verifizieren, sobald ein Bereich eingerichtet ist (`GET /clip/v2/resource/motion_area_configuration`).
-- **Sicherheitsbewegung nur bei aktivem Alarm?** Prüfen, ob `security_area_motion` nur bei scharf geschaltetem Hue Secure meldet.
+- **Bewegungsereignis der Bereichstypen:** Struktur von `motion` bei `convenience_area_motion` und `security_area_motion` im Event-Stream erfassen (Abschnitt 8).
+- **Sicherheitsbewegung nur bei aktivem Alarm?** Der Sicherheitsbereich ist auf der Test-Bridge deaktiviert (`enabled: false`). Prüfen, ob er nach dem Aktivieren meldet und ob er Hue Secure voraussetzt.
 - **Helligkeitswert:** Rohwert oder Lux an Loxone senden (betrifft auch den bestehenden Typ `light_level`).
 - **`enabled = false`:** Ob deaktivierte Raum- oder Bereichssensoren angezeigt oder ausgeblendet werden.
-- **Application-Key:** Der für die Analyse verwendete Key wurde im Chat übermittelt und sollte in der Hue-App entfernt werden, falls er nicht weiter gebraucht wird.
+- **Application-Key:** Der Key vom 13.10. wurde im Chat übermittelt, der Key vom 14.10. lag kurz in `%USERPROFILE%\.hue_key`. Beide in der Hue-App entfernen und die Datei löschen, sobald sie nicht mehr gebraucht werden.
+
+## 8. Vorgehen für später: Bewegungsereignis erfassen und Phase 2 umsetzen
+
+Voraussetzung: Man ist vor Ort (die Bridge `10.1.19.45` ist nur im Heimnetz erreichbar) und der Bereich „Büro Stefan“ existiert.
+
+1. **Application Key bereitstellen.** Neuen Key in der Hue-App erzeugen oder den vorhandenen verwenden. In eine Datei ausserhalb des Repos schreiben, damit er nicht im Chat landet:
+   ```powershell
+   Set-Content -Path $env:USERPROFILE\.hue_key -Value "KEY" -NoNewline
+   ```
+2. **Event-Stream aufzeichnen** (ca. 60 Sekunden, nur lesend). Während der Aufzeichnung durch das Büro laufen und danach den Raum verlassen und ruhig bleiben, damit „Bewegung“ und „keine Bewegung“ beide erfasst werden:
+   ```powershell
+   $k = (Get-Content $env:USERPROFILE\.hue_key -Raw).Trim()
+   curl.exe -sk -N --max-time 60 -H "hue-application-key: $k" -H "Accept: text/event-stream" `
+     "https://10.1.19.45/eventstream/clip/v2" | Tee-Object $env:TEMP\hue-events.txt
+   ```
+3. **Aufzeichnung auswerten:** Zeilen mit `convenience_area_motion` und `security_area_motion` heraussuchen. Zu klären: Pfad des Werts (erwartet `motion.motion_report.motion`), Zeitstempel, ob nach der Bewegung wieder `false` kommt.
+4. **Zweiter Lauf mit aktiviertem Sicherheitsbereich** (in der Hue-App einschalten), um das Verhalten von `security_area_motion` zu prüfen.
+5. **Phase 2 umsetzen** nach Abschnitt 4: Endpunkte in `GetSensors()`, Namensauflösung über `motion_area_configuration`, Events in `events.go`, Typen in `sensorkind.go`, Rückmeldung in `websocket.go`, Web-UI, Swagger, Tests (u. a. fehlendes bzw. leeres `motion`), CHANGELOG und README-Abschnitt „MotionAware-Daten liefern“ anpassen.
+6. **Aufräumen:** `.hue_key` und `hue-events.txt` löschen, Key in der Hue-App entfernen.
