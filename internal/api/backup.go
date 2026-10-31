@@ -281,6 +281,8 @@ func (h *Handlers) UploadBackup(w http.ResponseWriter, r *http.Request) {
 
 // RestoreBackup restores the configuration from a backup
 func (h *Handlers) RestoreBackup(w http.ResponseWriter, r *http.Request) {
+	mutationMu.Lock()
+	defer mutationMu.Unlock()
 	vars := mux.Vars(r)
 	id := vars["id"]
 
@@ -306,19 +308,17 @@ func (h *Handlers) RestoreBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Apply backup to current config
-	config.RestoreFromBackup(
-		backup.Config.Server,
-		backup.Config.Hue.BridgeIP,
-		backup.Config.Hue.ApplicationKey,
-		backup.Config.Loxone,
-		backup.Config.Logging,
-		backup.Config.Mappings,
-	)
-
-	// Save to disk
-	if err := config.Save(); err != nil {
-		errorResponse(w, http.StatusInternalServerError, "failed to save restored config")
+	if err := validateMappings(backup.Config.Mappings, backup.Config.Loxone.Miniservers); err != nil {
+		errorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	candidate := config.Snapshot()
+	candidate.Server = backup.Config.Server
+	candidate.Hue = config.HueConfig{BridgeIP: backup.Config.Hue.BridgeIP, ApplicationKey: backup.Config.Hue.ApplicationKey}
+	candidate.Loxone = backup.Config.Loxone
+	candidate.Logging = backup.Config.Logging
+	candidate.Mappings = backup.Config.Mappings
+	if !commitConfig(w, candidate) {
 		return
 	}
 

@@ -50,3 +50,17 @@ func TestHTTPSenderTLSVerification(t *testing.T) {
 		t.Error("verifying target was not paused after the TLS failure")
 	}
 }
+
+func TestHTTPErrorStartsBackoff(t *testing.T) {
+	var hits atomic.Int64
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { hits.Add(1); w.WriteHeader(401) }))
+	defer server.Close()
+	sender := NewHTTPSender()
+	defer sender.Close()
+	sender.Configure([]config.MiniserverConfig{{ID: "m", HTTPEnabled: true, HTTPURL: server.URL}})
+	sender.Send("m", "a", "on", 1)
+	sender.Send("m", "a", "on", 0)
+	if hits.Load() != 1 {
+		t.Fatal("rejected feedback did not trigger backoff")
+	}
+}

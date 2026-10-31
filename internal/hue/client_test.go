@@ -1,9 +1,11 @@
 package hue
 
 import (
+	"github.com/AES-Concepts-GmbH/loxone2hue/internal/models"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -161,5 +163,39 @@ func TestGetSensorsIncludesRoomAndHomeSensors(t *testing.T) {
 	device := sensors[byID["motion-1"]]
 	if device.Name != "Flur Sensor Motion" || device.Scope != "device" {
 		t.Errorf("device motion = %q/%q, want Flur Sensor Motion / device", device.Name, device.Scope)
+	}
+}
+
+func TestLightReadsDuringEvents(t *testing.T) {
+	c := NewClient("bridge", "key")
+	defer c.Close()
+	c.lights["a"] = &models.Light{ID: "a"}
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 1000; i++ {
+			_, err := c.GetLight("a")
+			if err != nil {
+				t.Error(err)
+			}
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 1000; i++ {
+			var item EventItem
+			item.ID = "a"
+			item.Type = "light"
+			item.On = &struct {
+				On bool `json:"on"`
+			}{On: true}
+			c.updateFromEvent(item)
+		}
+	}()
+	wg.Wait()
+	c.Configure("other", "other-key")
+	if _, ok := c.LightSnapshot("a"); ok {
+		t.Fatal("old bridge resource survived reconfiguration")
 	}
 }

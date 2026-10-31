@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -37,7 +38,7 @@ func TestSaveLeavesNoTempFileAndKeepsSecretsPrivate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat: %v", err)
 	}
-	if perm := info.Mode().Perm(); perm != 0600 {
+	if perm := info.Mode().Perm(); perm != 0600 && runtime.GOOS != "windows" {
 		t.Errorf("config mode = %04o, want 0600", perm)
 	}
 

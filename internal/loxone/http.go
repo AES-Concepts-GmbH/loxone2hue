@@ -3,6 +3,7 @@ package loxone
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -199,7 +200,15 @@ func (s *HTTPSender) sendHTTP(t *httpTarget, loxoneID, property string, value in
 			Dur("backoff", httpBackoff).Msg("Failed to send HTTP feedback, pausing this miniserver")
 		return
 	}
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 	resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		s.mu.Lock()
+		t.downUntil = time.Now().Add(httpBackoff)
+		s.mu.Unlock()
+		log.Warn().Str("miniserver", t.name).Int("status", resp.StatusCode).Msg("HTTP feedback rejected")
+		return
+	}
 
 	log.Info().Str("miniserver", t.name).Str("vi", viName).Interface("value", value).Int("status", resp.StatusCode).Msg("HTTP feedback sent")
 }

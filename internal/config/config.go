@@ -411,12 +411,26 @@ func Save() error {
 }
 
 // saveLocked writes the configuration; the caller holds mu.
-func saveLocked() error {
+func saveLocked() error { return saveValueLocked(cfg) }
+
+// Commit persists a candidate before publishing it to readers. Callers serialize
+// read-modify-write operations so candidates cannot overwrite newer changes.
+func Commit(next Config) error {
+	mu.Lock()
+	defer mu.Unlock()
+	if err := saveValueLocked(&next); err != nil {
+		return err
+	}
+	cfg = &next
+	return nil
+}
+
+func saveValueLocked(value *Config) error {
 	if cfgPath == "" {
 		cfgPath = "config.yaml"
 	}
 
-	data, err := yaml.Marshal(cfg)
+	data, err := yaml.Marshal(value)
 	if err != nil {
 		return err
 	}
