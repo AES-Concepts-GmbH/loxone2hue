@@ -65,6 +65,10 @@ export function useHueDevices() {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    if (isConnected) void fetchData(false);
+  }, [isConnected, fetchData]);
+
   const setLightState = useCallback(
     async (id: string, on?: boolean, brightness?: number) => {
       try {

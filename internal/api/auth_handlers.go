@@ -17,11 +17,6 @@ const minPasswordLength = 8
 func (h *Handlers) AuthStatus(w http.ResponseWriter, r *http.Request) {
 	auth := config.GetAuth()
 	authenticated := !auth.Enabled() || hasValidSession(r)
-	if !authenticated {
-		if user, pass, ok := r.BasicAuth(); ok {
-			authenticated = credentialsMatch(auth, user, pass)
-		}
-	}
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"enabled":       auth.Enabled(),
 		"username":      auth.User(),
@@ -83,6 +78,8 @@ func (h *Handlers) Logout(w http.ResponseWriter, r *http.Request) {
 // counts as a failed login for the throttling. Every other browser session is
 // logged out afterwards, the caller receives a fresh one.
 func (h *Handlers) UpdateAuth(w http.ResponseWriter, r *http.Request) {
+	mutationMu.Lock()
+	defer mutationMu.Unlock()
 	var req struct {
 		Username        string `json:"username"`
 		CurrentPassword string `json:"current_password"`
@@ -121,11 +118,17 @@ func (h *Handlers) UpdateAuth(w http.ResponseWriter, r *http.Request) {
 		next = config.AuthConfig{Username: username, Password: req.NewPassword}
 	}
 
-	if err := config.UpdateAuth(next); err != nil {
-		errorResponse(w, http.StatusInternalServerError, "failed to hash password")
-		return
+	if next.Password != "" {
+		hash, err := config.HashPassword(next.Password)
+		if err != nil {
+			errorResponse(w, http.StatusBadRequest, "password cannot be hashed")
+			return
+		}
+		next.PasswordHash, next.Password = hash, ""
 	}
-	if !saveConfig(w, "login settings", func() { _ = config.UpdateAuth(current) }) {
+	candidate := config.Snapshot()
+	candidate.Auth = next
+	if !commitConfig(w, candidate) {
 		return
 	}
 
