@@ -1,8 +1,8 @@
-import { ExternalLink, Terminal } from 'lucide-react';
+import { ExternalLink, Link2, Terminal } from 'lucide-react';
 import type { Mapping } from '../../types';
 import { CopyButton } from '../CopyButton';
 import { Tooltip } from '../Tooltip';
-import { getLoxoneGuide, getTestUrls } from '../../utils/loxoneGuide';
+import { buildExternalUrl, getLoxoneGuide, getTestUrls } from '../../utils/loxoneGuide';
 import type { MappingEnv } from './env';
 
 interface MappingGuideProps {
@@ -58,6 +58,12 @@ export function MappingGuide({ mapping, env }: MappingGuideProps) {
                   <span className="text-xs text-gray-400">{test.label}</span>
                   <div className="flex gap-2">
                     <CopyButton text={test.url} />
+                    <CopyButton
+                      text={buildExternalUrl(test.url, env.gatewayPort)}
+                      label="Volle URL"
+                      tooltip="Vollständige URL für externen Client kopieren (direkt auf Gateway-Port)"
+                      icon={<Link2 size={12} />}
+                    />
                     <Tooltip content="Im Browser testen" position="top">
                       <a
                         href={test.url}

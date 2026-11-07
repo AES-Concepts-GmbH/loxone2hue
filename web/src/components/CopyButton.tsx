@@ -1,14 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 import { copyToClipboard } from '../utils/clipboard';
 
 interface CopyButtonProps {
   text: string;
+  /** Button caption; defaults to "Kopieren". */
+  label?: string;
+  /** Tooltip and aria-label; defaults to "In Zwischenablage kopieren". */
+  tooltip?: string;
+  /** Icon shown before the caption; defaults to the copy icon. */
+  icon?: ReactNode;
 }
 
 /** Copies `text` and shows "Kopiert!" for two seconds. */
-export function CopyButton({ text }: CopyButtonProps) {
+export function CopyButton({ text, label = 'Kopieren', tooltip = 'In Zwischenablage kopieren', icon }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -27,10 +33,10 @@ export function CopyButton({ text }: CopyButtonProps) {
   };
 
   return (
-    <Tooltip content="In Zwischenablage kopieren" position="top">
+    <Tooltip content={tooltip} position="top">
       <button
         type="button"
-        aria-label="In Zwischenablage kopieren"
+        aria-label={tooltip}
         onClick={handleClick}
         className={`px-2 py-1 rounded transition-all flex items-center gap-1 text-xs ${
           copied ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white'
@@ -43,8 +49,8 @@ export function CopyButton({ text }: CopyButtonProps) {
           </>
         ) : (
           <>
-            <Copy size={12} />
-            <span>Kopieren</span>
+            {icon ?? <Copy size={12} />}
+            <span>{label}</span>
           </>
         )}
       </button>

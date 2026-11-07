@@ -7,6 +7,8 @@ export interface MappingEnv extends HueResources {
   /** At least one Miniserver has UDP resp. HTTP feedback enabled. */
   hasUDP: boolean;
   hasHTTP: boolean;
+  /** Port the gateway listens on (server config), used to build URLs for external clients. */
+  gatewayPort?: number;
 }
 
 export function errorMessage(err: unknown, fallback: string): string {
