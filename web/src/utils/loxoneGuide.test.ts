@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Mapping } from '../types';
-import { getLoxoneGuide, getSensorFeedbackInfo, getTestUrls } from './loxoneGuide';
+import { buildExternalUrl, getLoxoneGuide, getSensorFeedbackInfo, getTestUrls } from './loxoneGuide';
 
 function mapping(loxoneId: string, hueType: string, extra: Partial<Mapping> = {}): Mapping {
   return { id: loxoneId, name: loxoneId, loxone_id: loxoneId, hue_id: 'h', hue_type: hueType, enabled: true, ...extra };
@@ -58,5 +58,18 @@ describe('getTestUrls', () => {
     ]);
     const lightUrls = getTestUrls(mapping('wz_decke', 'light'));
     expect(lightUrls[lightUrls.length - 1]).toEqual({ label: 'Farbtemperatur 4000K', url: './ws?cmd=SET%20wz_decke%20CT%204000' });
+  });
+});
+
+describe('buildExternalUrl', () => {
+  const ingress = { protocol: 'http:', hostname: '10.1.19.47', port: '8123' };
+
+  it('uses the page hostname with the configured gateway port', () => {
+    expect(buildExternalUrl('./ws?cmd=SET%20a%20ON', 8080, ingress)).toBe('http://10.1.19.47:8080/ws?cmd=SET%20a%20ON');
+  });
+
+  it('falls back to the page port, or none', () => {
+    expect(buildExternalUrl('./ws?cmd=X', undefined, ingress)).toBe('http://10.1.19.47:8123/ws?cmd=X');
+    expect(buildExternalUrl('./ws?cmd=X', undefined, { ...ingress, port: '' })).toBe('http://10.1.19.47/ws?cmd=X');
   });
 });

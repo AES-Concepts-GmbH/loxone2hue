@@ -158,6 +158,22 @@ function buildTestUrl(cmd: string): string {
   return `./ws?cmd=${encodeURIComponent(cmd)}`;
 }
 
+/**
+ * Turns a relative test URL into an absolute one an external client (curl,
+ * another browser, the Miniserver) can call directly on the gateway port.
+ * Like the Loxone export, it uses the page's hostname with the configured
+ * server port, so it bypasses a reverse proxy such as Home Assistant Ingress.
+ */
+export function buildExternalUrl(
+  relativeUrl: string,
+  gatewayPort: number | undefined,
+  location: Pick<Location, 'protocol' | 'hostname' | 'port'> = window.location,
+): string {
+  const port = gatewayPort ?? (location.port ? Number(location.port) : undefined);
+  const origin = `${location.protocol}//${location.hostname}${port ? `:${port}` : ''}`;
+  return `${origin}/${relativeUrl.replace(/^\.?\//, '')}`;
+}
+
 /** Browser-testable command URLs. Sensors only send data, so they have none. */
 export function getTestUrls(mapping: Mapping): TestUrl[] {
   const loxoneId = mapping.loxone_id;

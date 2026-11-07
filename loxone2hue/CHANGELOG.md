@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.3
+
+- Mappings: Neben "Kopieren" und "Testen" gibt es bei jedem Befehl den Button "Volle URL". Er kopiert die vollstaendige URL (Hostname + konfigurierter Gateway-Port, z. B. http://10.1.19.47:8080/ws?cmd=SET%20buero%20ON) fuer den Aufruf von einem externen Client; der Aufruf geht direkt ans Gateway und nicht ueber Home Assistant Ingress
+
 ## 1.5.2
 
 - LICENSE und Footer der Web-UI nennen Stefan Beyeler und AES Concepts GmbH als Rechteinhaber
