@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.7
+
+- Anleitung: Kopier-Buttons fuer die Adresse des Virtuellen Ausgangs (Schritt 2.1 und Praxis-Beispiel), die Test-URL im Troubleshooting und alle Beispiel-Befehle (/ws?cmd=...). Bei eingeschaltetem Login-Schutz fragen die Adress-Buttons wie bei "Volle URL" das Passwort ab (nicht gespeichert, Vorschau maskiert); ein einmal eingegebenes Passwort gilt fuer alle Adressen der Anleitung, bis sie verlassen wird
+- Adresse und volle URL verwenden immer http://, auch wenn die Web-UI ueber einen HTTPS-Proxy geoeffnet ist; das Gateway selbst spricht nur HTTP
+
 ## 1.5.6
 
 - Mappings: Bei eingeschaltetem Login-Schutz fragt "Volle URL" das Passwort ab. Die URL mit Zugangsdaten wird waehrend der Eingabe angezeigt (Passwort maskiert, per Auge einblendbar) und mit "URL kopieren" oder Enter kopiert. Das Passwort wird URL-kodiert, nur im Speicher der Seite gehalten und weder gespeichert noch an das Gateway gesendet. Ohne Eingabe bleibt der Platzhalter <passwort>

@@ -180,14 +180,25 @@ export interface ExternalUrlOptions {
  */
 export function buildExternalUrl(
   relativeUrl: string,
+  options: ExternalUrlOptions = {},
+  location: Pick<Location, 'hostname' | 'port'> = window.location,
+): string {
+  return `${buildGatewayAddress(options, location)}/${relativeUrl.replace(/^\.?\//, '')}`;
+}
+
+/**
+ * The gateway address as entered in a Loxone Virtual Output
+ * (`http://[user:passwort@]host:port`). The gateway itself only speaks plain
+ * HTTP, so the scheme is http even when the page came through an HTTPS proxy.
+ */
+export function buildGatewayAddress(
   { gatewayPort, authUser, authPassword }: ExternalUrlOptions = {},
-  location: Pick<Location, 'protocol' | 'hostname' | 'port'> = window.location,
+  location: Pick<Location, 'hostname' | 'port'> = window.location,
 ): string {
   const port = gatewayPort ?? (location.port ? Number(location.port) : undefined);
   const password = authPassword ? encodeURIComponent(authPassword) : PASSWORD_PLACEHOLDER;
   const credentials = authUser ? `${encodeURIComponent(authUser)}:${password}@` : '';
-  const origin = `${location.protocol}//${credentials}${location.hostname}${port ? `:${port}` : ''}`;
-  return `${origin}/${relativeUrl.replace(/^\.?\//, '')}`;
+  return `http://${credentials}${location.hostname}${port ? `:${port}` : ''}`;
 }
 
 /** Browser-testable command URLs. Sensors only send data, so they have none. */
