@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { ExternalLink, Link2, Terminal } from 'lucide-react';
 import type { Mapping } from '../../types';
 import { CopyButton } from '../CopyButton';
 import { Tooltip } from '../Tooltip';
-import { buildExternalUrl, getLoxoneGuide, getTestUrls, PASSWORD_PLACEHOLDER } from '../../utils/loxoneGuide';
+import { buildExternalUrl, getLoxoneGuide, getTestUrls } from '../../utils/loxoneGuide';
+import { FullUrlPanel } from './FullUrlPanel';
 import type { MappingEnv } from './env';
 
 interface MappingGuideProps {
@@ -17,6 +19,10 @@ export function MappingGuide({ mapping, env }: MappingGuideProps) {
     : undefined;
   const guide = getLoxoneGuide(mapping, { sensorType, hasUDP: env.hasUDP, hasHTTP: env.hasHTTP });
   const testUrls = getTestUrls(mapping);
+  // "Volle URL" with the login on: which row asks for the password, and the
+  // password itself. Component state only, gone when the guide closes.
+  const [passwordFor, setPasswordFor] = useState<string | null>(null);
+  const [password, setPassword] = useState('');
 
   return (
     <div className="border-t border-gray-700 pt-3 mt-3">
@@ -58,14 +64,28 @@ export function MappingGuide({ mapping, env }: MappingGuideProps) {
                   <span className="text-xs text-gray-400">{test.label}</span>
                   <div className="flex gap-2">
                     <CopyButton text={test.url} />
-                    <CopyButton
-                      text={buildExternalUrl(test.url, { gatewayPort: env.gatewayPort, authUser: env.authUser })}
-                      label="Volle URL"
-                      tooltip={env.authUser
-                        ? `Vollständige URL mit Zugangsdaten kopieren (${PASSWORD_PLACEHOLDER} durch das Passwort ersetzen)`
-                        : 'Vollständige URL für externen Client kopieren (direkt auf Gateway-Port)'}
-                      icon={<Link2 size={12} />}
-                    />
+                    {env.authUser ? (
+                      <Tooltip content="Vollständige URL mit Zugangsdaten erzeugen (Passwort wird abgefragt, nicht gespeichert)" position="top">
+                        <button
+                          type="button"
+                          aria-expanded={passwordFor === test.url}
+                          onClick={() => setPasswordFor(passwordFor === test.url ? null : test.url)}
+                          className={`px-2 py-1 rounded transition-all flex items-center gap-1 text-xs ${
+                            passwordFor === test.url ? 'bg-gray-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white'
+                          }`}
+                        >
+                          <Link2 size={12} />
+                          <span>Volle URL</span>
+                        </button>
+                      </Tooltip>
+                    ) : (
+                      <CopyButton
+                        text={buildExternalUrl(test.url, { gatewayPort: env.gatewayPort })}
+                        label="Volle URL"
+                        tooltip="Vollständige URL für externen Client kopieren (direkt auf Gateway-Port)"
+                        icon={<Link2 size={12} />}
+                      />
+                    )}
                     <Tooltip content="Im Browser testen" position="top">
                       <a
                         href={test.url}
@@ -80,6 +100,16 @@ export function MappingGuide({ mapping, env }: MappingGuideProps) {
                   </div>
                 </div>
                 <code className="block text-sm text-green-400 font-mono break-all">{test.url}</code>
+                {env.authUser && passwordFor === test.url && (
+                  <FullUrlPanel
+                    url={test.url}
+                    gatewayPort={env.gatewayPort}
+                    authUser={env.authUser}
+                    password={password}
+                    onPasswordChange={setPassword}
+                    onClose={() => setPasswordFor(null)}
+                  />
+                )}
               </div>
             ))}
           </div>

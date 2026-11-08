@@ -79,4 +79,11 @@ describe('buildExternalUrl', () => {
     expect(buildExternalUrl('./ws?cmd=X', { gatewayPort: 8080, authUser: 'max@home' }, ingress))
       .toBe('http://max%40home:<passwort>@10.1.19.47:8080/ws?cmd=X');
   });
+
+  it('puts a typed password in, URL-encoded', () => {
+    expect(buildExternalUrl('./ws?cmd=X', { gatewayPort: 8080, authUser: 'admin', authPassword: 'g3h:im@#1' }, ingress))
+      .toBe('http://admin:g3h%3Aim%40%231@10.1.19.47:8080/ws?cmd=X');
+    expect(buildExternalUrl('./ws?cmd=X', { gatewayPort: 8080, authUser: 'admin', authPassword: '' }, ingress))
+      .toBe('http://admin:<passwort>@10.1.19.47:8080/ws?cmd=X');
+  });
 });

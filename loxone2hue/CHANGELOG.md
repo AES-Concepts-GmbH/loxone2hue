@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.6
+
+- Mappings: Bei eingeschaltetem Login-Schutz fragt "Volle URL" das Passwort ab. Die URL mit Zugangsdaten wird waehrend der Eingabe angezeigt (Passwort maskiert, per Auge einblendbar) und mit "URL kopieren" oder Enter kopiert. Das Passwort wird URL-kodiert, nur im Speicher der Seite gehalten und weder gespeichert noch an das Gateway gesendet. Ohne Eingabe bleibt der Platzhalter <passwort>
+
 ## 1.5.5
 
 - Mappings: Bei eingeschaltetem Login-Schutz kopiert "Volle URL" die Adresse mit Benutzername und Passwort-Platzhalter (z. B. http://admin:<passwort>@10.1.19.47:8080/ws?cmd=SET%20buero%20ON); der Platzhalter wird durch das Passwort ersetzt. Ohne Login-Schutz bleibt die URL ohne Zugangsdaten
