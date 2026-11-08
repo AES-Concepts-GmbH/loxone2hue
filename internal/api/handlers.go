@@ -484,7 +484,7 @@ func (h *Handlers) GetConfig(w http.ResponseWriter, r *http.Request) {
 	safeConfig := map[string]interface{}{
 		"server": cfg.Server,
 		"auth": map[string]interface{}{
-			"enabled":    auth.Enabled(),
+			"enabled":       auth.Enabled(),
 			"configured":    auth.Configured(),
 			"username":      auth.User(),
 			"trust_ingress": auth.TrustsIngress(),
