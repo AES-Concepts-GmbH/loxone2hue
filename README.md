@@ -116,6 +116,7 @@ auth:
   username: "admin"
   password: ""            # Leer = kein Login. Ein hier eingetragenes Passwort wird beim
                           # ersten Start gehasht (password_hash) und aus der Datei entfernt
+  disabled: false         # true = Login ausgeschaltet, Zugangsdaten bleiben gespeichert
 
 hue:
   bridge_ip: ""           # Leer für Auto-Discovery
@@ -150,6 +151,7 @@ Das Passwort wird unter **Einstellungen → Login-Schutz** gesetzt oder geänder
 - API-Clients und Loxone senden HTTP Basic Auth; Loxone übergibt die Zugangsdaten in der Adresse des Virtuellen Ausgangs: `http://admin:passwort@gateway-ip:8080`.
 - Nach fünf Fehlversuchen wird die Absenderadresse 30 Sekunden gesperrt, bei weiteren Fehlversuchen jeweils doppelt so lang (höchstens eine Stunde); die Antwort ist dann `429` mit `Retry-After`.
 - `GET /api/health` bleibt für den Container-Healthcheck offen.
+- Der Schalter unter **Einstellungen → Login-Schutz** schaltet den Schutz aus und wieder ein, ohne die Zugangsdaten zu löschen (`auth.disabled`). Beide Richtungen verlangen das gespeicherte Passwort. Die Anleitung (Schritt 2) zeigt die Adresse des Virtuellen Ausgangs passend zum aktuellen Zustand, mit oder ohne Zugangsdaten.
 
 Ohne Passwort zeigt die Web-UI dauerhaft einen Warnhinweis: Wer das Gateway im Netzwerk erreicht, kann dann Lichter steuern und Backups mit dem Hue-Schlüssel und den Miniserver-Passwörtern herunterladen. Im Home-Assistant-Add-on ist der Login standardmässig aus, weil Home Assistant den Zugang über Ingress schützt; das Add-on läuft aber mit `host_network`, Port 8080 ist damit im LAN erreichbar, ein Passwort ist auch dort empfohlen.
 

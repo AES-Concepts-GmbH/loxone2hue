@@ -35,6 +35,8 @@ async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
 // Login
 export interface AuthStatus {
   enabled: boolean;
+  /** A password is stored, even while the protection is switched off. */
+  configured?: boolean;
   username: string;
   authenticated: boolean;
 }
@@ -58,11 +60,19 @@ export interface AuthUpdate {
   username?: string;
   current_password?: string;
   new_password?: string;
-  disable?: boolean;
+  /** Switches the protection on or off; the stored password is kept. */
+  enabled?: boolean;
 }
 
-/** Sets, changes or disables the login; the server issues a fresh session on success. */
-export async function updateAuth(update: AuthUpdate): Promise<{ status: string; enabled: boolean; username?: string }> {
+export interface AuthUpdateResult {
+  status: string;
+  enabled: boolean;
+  configured?: boolean;
+  username?: string;
+}
+
+/** Sets or changes the password, or switches the login on/off; with the login on the server issues a fresh session. */
+export async function updateAuth(update: AuthUpdate): Promise<AuthUpdateResult> {
   return fetchJSON(`${API_BASE}/auth`, {
     method: 'PUT',
     body: JSON.stringify(update),
@@ -213,6 +223,7 @@ export interface ConfigResponse {
   };
   auth: {
     enabled: boolean;
+    configured?: boolean;
     username: string;
   };
   hue: {

@@ -68,6 +68,9 @@ type LoggingConfig struct {
 // No password disables authentication, which keeps existing installations
 // — and the Home Assistant Ingress setup — working unchanged.
 //
+// Disabled switches the protection off while keeping the credentials, so it
+// can be switched on again from the settings without choosing a new password.
+//
 // Password is only ever read from a hand-edited file: Load hashes it into
 // PasswordHash, clears it and writes the file back, so the plain text does
 // not stay on disk or end up in backups. UpdateAuth does the same for a
@@ -76,11 +79,17 @@ type AuthConfig struct {
 	Username     string `yaml:"username" json:"username"`
 	Password     string `yaml:"password,omitempty" json:"-"`
 	PasswordHash string `yaml:"password_hash,omitempty" json:"-"`
+	Disabled     bool   `yaml:"disabled,omitempty" json:"-"`
 }
 
-// Enabled reports whether authentication is configured.
-func (a AuthConfig) Enabled() bool {
+// Configured reports whether a password is stored, switched on or not.
+func (a AuthConfig) Configured() bool {
 	return a.PasswordHash != "" || a.Password != ""
+}
+
+// Enabled reports whether authentication is configured and switched on.
+func (a AuthConfig) Enabled() bool {
+	return a.Configured() && !a.Disabled
 }
 
 // Verify reports whether password matches the stored credential. It accepts

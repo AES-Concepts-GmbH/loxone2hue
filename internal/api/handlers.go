@@ -484,8 +484,9 @@ func (h *Handlers) GetConfig(w http.ResponseWriter, r *http.Request) {
 	safeConfig := map[string]interface{}{
 		"server": cfg.Server,
 		"auth": map[string]interface{}{
-			"enabled":  auth.Enabled(),
-			"username": auth.User(),
+			"enabled":    auth.Enabled(),
+			"configured": auth.Configured(),
+			"username":   auth.User(),
 		},
 		"hue": map[string]interface{}{
 			"bridge_ip":  cfg.Hue.BridgeIP,

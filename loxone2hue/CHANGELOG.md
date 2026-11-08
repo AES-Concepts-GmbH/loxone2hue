@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.4
+
+- Login-Schutz: Schalter in Einstellungen > Login-Schutz zum Aus- und Wiedereinschalten. Ausschalten behaelt Benutzername und Passwort (neu: auth.disabled), Einschalten nutzt das gespeicherte Passwort; beide Richtungen verlangen die Bestaetigung mit dem Passwort. Bisher loeschte das Ausschalten die Zugangsdaten
+- Bei ausgeschaltetem Login-Schutz laesst sich das Passwort ohne das alte Passwort aendern (Wiederherstellung bei vergessenem Passwort); der Schutz bleibt dabei aus
+- Anleitung, Schritt 2: Die Adresse des Virtuellen Ausgangs wird passend zum Login-Schutz angezeigt, mit Zugangsdaten (http://admin:<passwort>@gateway:port) samt Hinweisen zu 401/429 und Sonderzeichen oder ohne. Praxis-Beispiel, Troubleshooting und Hinweis zum XML-Export ebenso
+- API: GET /api/auth/status und GET /api/config melden zusaetzlich configured; PUT /api/auth versteht enabled=true/false
+
 ## 1.5.3
 
 - Mappings: Neben "Kopieren" und "Testen" gibt es bei jedem Befehl den Button "Volle URL". Er kopiert die vollstaendige URL (Hostname + konfigurierter Gateway-Port, z. B. http://10.1.19.47:8080/ws?cmd=SET%20buero%20ON) fuer den Aufruf von einem externen Client; der Aufruf geht direkt ans Gateway und nicht ueber Home Assistant Ingress
