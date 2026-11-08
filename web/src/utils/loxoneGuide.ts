@@ -166,6 +166,8 @@ export interface ExternalUrlOptions {
   gatewayPort?: number;
   /** Username of the login protection when it is switched on; adds `user:<passwort>@`. */
   authUser?: string;
+  /** Password typed by the user; replaces the placeholder (URL-encoded). */
+  authPassword?: string;
 }
 
 /**
@@ -178,11 +180,12 @@ export interface ExternalUrlOptions {
  */
 export function buildExternalUrl(
   relativeUrl: string,
-  { gatewayPort, authUser }: ExternalUrlOptions = {},
+  { gatewayPort, authUser, authPassword }: ExternalUrlOptions = {},
   location: Pick<Location, 'protocol' | 'hostname' | 'port'> = window.location,
 ): string {
   const port = gatewayPort ?? (location.port ? Number(location.port) : undefined);
-  const credentials = authUser ? `${encodeURIComponent(authUser)}:${PASSWORD_PLACEHOLDER}@` : '';
+  const password = authPassword ? encodeURIComponent(authPassword) : PASSWORD_PLACEHOLDER;
+  const credentials = authUser ? `${encodeURIComponent(authUser)}:${password}@` : '';
   const origin = `${location.protocol}//${credentials}${location.hostname}${port ? `:${port}` : ''}`;
   return `${origin}/${relativeUrl.replace(/^\.?\//, '')}`;
 }
