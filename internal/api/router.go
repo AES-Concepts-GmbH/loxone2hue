@@ -24,6 +24,22 @@ type Server struct {
 	mappingManager *loxone.MappingManager
 	udpSender      *loxone.UDPSender
 	httpSender     *loxone.HTTPSender
+
+	// Home Assistant Ingress listener, see ingress.go. Port 0 disables it.
+	ingressPort    int
+	ingressProxyIP string
+	ingressServer  *http.Server
+}
+
+// EnableIngress serves the UI for Home Assistant Ingress on a port of its
+// own, where requests from the Supervisor at proxyIP skip the gateway login
+// (unless auth.ingress_login_required is set). Call before Start.
+func (s *Server) EnableIngress(port int, proxyIP string) {
+	if proxyIP == "" {
+		proxyIP = DefaultIngressProxyIP
+	}
+	s.ingressPort = port
+	s.ingressProxyIP = proxyIP
 }
 
 // NewServer creates a new API server
@@ -162,6 +178,27 @@ func (s *Server) Start(ctx context.Context, host string, port int) error {
 		}
 	}()
 
+	if s.ingressPort > 0 && s.ingressPort != port {
+		ingressAddr := fmt.Sprintf("%s:%d", host, s.ingressPort)
+		s.ingressServer = &http.Server{
+			Addr:         ingressAddr,
+			Handler:      ingressMiddleware(s.ingressProxyIP, s.router),
+			ReadTimeout:  15 * time.Second,
+			WriteTimeout: 15 * time.Second,
+			IdleTimeout:  60 * time.Second,
+		}
+		log.Info().Str("addr", ingressAddr).Str("proxy", s.ingressProxyIP).
+			Bool("ha_login", config.GetAuth().TrustsIngress()).
+			Msg("Starting Home Assistant Ingress listener")
+		go func() {
+			// A failing Ingress listener must not take the gateway down:
+			// Loxone talks to the main port.
+			if err := s.ingressServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Error().Err(err).Str("addr", ingressAddr).Msg("Home Assistant Ingress listener failed")
+			}
+		}()
+	}
+
 	select {
 	case <-ctx.Done():
 		return s.Shutdown()
@@ -176,6 +213,9 @@ func (s *Server) Shutdown() error {
 	defer cancel()
 
 	log.Info().Msg("Shutting down HTTP server")
+	if s.ingressServer != nil {
+		_ = s.ingressServer.Shutdown(ctx)
+	}
 	return s.httpServer.Shutdown(ctx)
 }
 

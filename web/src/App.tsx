@@ -8,7 +8,7 @@ import { RefreshCw, AlertCircle } from 'lucide-react';
 type AuthState =
   | { kind: 'unknown' }
   | { kind: 'required'; username: string }
-  | { kind: 'ok'; enabled: boolean };
+  | { kind: 'ok'; enabled: boolean; ingress: boolean; haLogin: boolean; haUser: string };
 
 function App() {
   const [auth, setAuth] = useState<AuthState>({ kind: 'unknown' });
@@ -25,7 +25,13 @@ function App() {
         setAuth({ kind: 'required', username: status.username });
         return;
       }
-      setAuth({ kind: 'ok', enabled: status.enabled });
+      setAuth({
+        kind: 'ok',
+        enabled: status.enabled,
+        ingress: Boolean(status.ingress),
+        haLogin: Boolean(status.ha_login),
+        haUser: status.ha_user ?? '',
+      });
       const response = await api.getBridge();
       setConfigured(response.configured);
     } catch (err) {
@@ -96,7 +102,25 @@ function App() {
     return <BridgeSetup onComplete={() => setConfigured(true)} />;
   }
 
-  return <Dashboard authEnabled={auth.enabled} onLogout={handleLogout} onAuthChanged={(enabled) => setAuth({ kind: 'ok', enabled })} />;
+  return (
+    <Dashboard
+      authEnabled={auth.enabled}
+      viaIngress={auth.ingress}
+      haLogin={auth.haLogin}
+      haUser={auth.haUser}
+      onLogout={handleLogout}
+      onAuthChanged={(enabled) => setAuth({ ...auth, enabled })}
+      onIngressTrustChanged={(trust) => {
+        // Without the Home Assistant sign-in the sidebar needs the gateway
+        // login again; the settings call issued no session for it.
+        if (auth.ingress && auth.enabled && !trust) {
+          setAuth({ kind: 'required', username: '' });
+          return;
+        }
+        setAuth({ ...auth, haLogin: auth.ingress && trust });
+      }}
+    />
+  );
 }
 
 export default App;

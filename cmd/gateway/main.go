@@ -27,6 +27,8 @@ func main() {
 	// Parse command line flags
 	configPath := flag.String("config", "configs/config.yaml", "Path to configuration file")
 	showVersion := flag.Bool("version", false, "Show version information")
+	ingressPort := flag.Int("ingress-port", 0, "Port for Home Assistant Ingress (0 = off); requests from the Supervisor there skip the gateway login")
+	ingressProxy := flag.String("ingress-proxy", api.DefaultIngressProxyIP, "Address the Home Assistant Supervisor proxies Ingress requests from")
 	flag.Parse()
 
 	if *showVersion {
@@ -68,6 +70,9 @@ func main() {
 
 	// Create API server
 	server := api.NewServer(hueClient, mappingManager, udpSender, httpSender)
+	if *ingressPort > 0 {
+		server.EnableIngress(*ingressPort, *ingressProxy)
+	}
 
 	// Setup context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())

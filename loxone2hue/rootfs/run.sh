@@ -74,4 +74,7 @@ bashio::log.info "Config path: ${PERSISTENT_CONFIG_PATH}"
 
 # Change to app directory and start gateway with persistent config
 cd /app
-exec ./gateway -config ${PERSISTENT_CONFIG_PATH}
+# Ingress gets a port of its own (ingress_port in config.yaml): requests the
+# Supervisor proxies there are already signed in to Home Assistant and skip
+# the gateway login. Port 8080 keeps the login for Loxone and direct access.
+exec ./gateway -config ${PERSISTENT_CONFIG_PATH} -ingress-port 18099

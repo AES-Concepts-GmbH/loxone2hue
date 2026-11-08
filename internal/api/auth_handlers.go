@@ -16,13 +16,21 @@ const minPasswordLength = 8
 // the username, which the Basic Auth realm would prompt for anyway.
 func (h *Handlers) AuthStatus(w http.ResponseWriter, r *http.Request) {
 	auth := config.GetAuth()
-	authenticated := !auth.Enabled() || hasValidSession(r)
-	jsonResponse(w, http.StatusOK, map[string]interface{}{
+	ingress := isIngressRequest(r)
+	viaHA := ingress && auth.TrustsIngress()
+	authenticated := !auth.Enabled() || viaHA || hasValidSession(r)
+	status := map[string]interface{}{
 		"enabled":       auth.Enabled(),
 		"configured":    auth.Configured(),
 		"username":      auth.User(),
 		"authenticated": authenticated,
-	})
+		"ingress":       ingress,
+		"ha_login":      viaHA,
+	}
+	if ingress {
+		status["ha_user"] = ingressUser(r)
+	}
+	jsonResponse(w, http.StatusOK, status)
 }
 
 // Login checks a username and password from the Web UI's login form and
@@ -97,8 +105,13 @@ func (h *Handlers) UpdateAuth(w http.ResponseWriter, r *http.Request) {
 		NewPassword     string `json:"new_password"`
 		Enabled         *bool  `json:"enabled"`
 		Disable         bool   `json:"disable"`
+		TrustIngress    *bool  `json:"trust_ingress"`
 	}
 	if !decodeJSON(w, r, &req, "invalid request body") {
+		return
+	}
+	if req.TrustIngress != nil && req.NewPassword == "" && req.Enabled == nil && !req.Disable {
+		updateIngressTrust(w, r, *req.TrustIngress, req.CurrentPassword)
 		return
 	}
 	if req.Disable {
@@ -142,7 +155,12 @@ func (h *Handlers) UpdateAuth(w http.ResponseWriter, r *http.Request) {
 		if req.Enabled != nil {
 			disabled = !*req.Enabled
 		}
-		next = config.AuthConfig{Username: username, PasswordHash: hash, Disabled: disabled}
+		next = config.AuthConfig{
+			Username:             username,
+			PasswordHash:         hash,
+			Disabled:             disabled,
+			IngressLoginRequired: current.IngressLoginRequired,
+		}
 	}
 
 	candidate := config.Snapshot()
@@ -181,6 +199,36 @@ func (h *Handlers) UpdateAuth(w http.ResponseWriter, r *http.Request) {
 		"enabled":    true,
 		"configured": true,
 		"username":   next.User(),
+	})
+}
+
+// updateIngressTrust switches whether the Home Assistant sign-in replaces the
+// gateway login in the sidebar. A request through Ingress is signed in to
+// Home Assistant and needs no password; a direct one has to confirm the
+// password while the protection is on. Sessions stay valid: the change does
+// not touch the password.
+func updateIngressTrust(w http.ResponseWriter, r *http.Request, trust bool, currentPassword string) {
+	current := config.GetAuth()
+	if current.Enabled() && !isIngressRequest(r) {
+		if !verifyCurrentPassword(w, r, current, currentPassword) {
+			return
+		}
+	}
+
+	next := current
+	next.IngressLoginRequired = !trust
+	candidate := config.Snapshot()
+	candidate.Auth = next
+	if !commitConfig(w, candidate) {
+		return
+	}
+	log.Info().Bool("trust_ingress", trust).Msg("Home Assistant sign-in for Ingress changed via settings")
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"status":        "ok",
+		"enabled":       next.Enabled(),
+		"configured":    next.Configured(),
+		"username":      next.User(),
+		"trust_ingress": next.TrustsIngress(),
 	})
 }
 

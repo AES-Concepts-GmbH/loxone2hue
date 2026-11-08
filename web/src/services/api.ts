@@ -39,6 +39,12 @@ export interface AuthStatus {
   configured?: boolean;
   username: string;
   authenticated: boolean;
+  /** The request came through Home Assistant Ingress (sidebar panel). */
+  ingress?: boolean;
+  /** Signed in through Home Assistant: no gateway login needed. */
+  ha_login?: boolean;
+  /** Home Assistant user named by the Supervisor, via Ingress only. */
+  ha_user?: string;
 }
 
 export async function getAuthStatus(): Promise<AuthStatus> {
@@ -62,6 +68,8 @@ export interface AuthUpdate {
   new_password?: string;
   /** Switches the protection on or off; the stored password is kept. */
   enabled?: boolean;
+  /** Lets the Home Assistant sign-in replace the gateway login in the sidebar. */
+  trust_ingress?: boolean;
 }
 
 export interface AuthUpdateResult {
@@ -69,6 +77,7 @@ export interface AuthUpdateResult {
   enabled: boolean;
   configured?: boolean;
   username?: string;
+  trust_ingress?: boolean;
 }
 
 /** Sets or changes the password, or switches the login on/off; with the login on the server issues a fresh session. */
@@ -225,6 +234,8 @@ export interface ConfigResponse {
     enabled: boolean;
     configured?: boolean;
     username: string;
+    /** Home Assistant sign-in replaces the gateway login in the sidebar. */
+    trust_ingress?: boolean;
   };
   hue: {
     bridge_ip: string;

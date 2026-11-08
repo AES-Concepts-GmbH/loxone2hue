@@ -122,7 +122,10 @@ const openAPISpec = `{
                     "enabled": { "type": "boolean", "description": "Login-Schutz eingeschaltet" },
                     "configured": { "type": "boolean", "description": "Passwort gespeichert (auch wenn ausgeschaltet)" },
                     "username": { "type": "string", "example": "admin" },
-                    "authenticated": { "type": "boolean" }
+                    "authenticated": { "type": "boolean" },
+                    "ingress": { "type": "boolean", "description": "Anfrage kam über Home Assistant Ingress (eigener Ingress-Port, nur vom Supervisor)" },
+                    "ha_login": { "type": "boolean", "description": "Über Home Assistant angemeldet, kein Gateway-Login nötig" },
+                    "ha_user": { "type": "string", "description": "Home-Assistant-Benutzer laut Supervisor (nur über Ingress)" }
                   }
                 }
               }
@@ -173,7 +176,7 @@ const openAPISpec = `{
       "put": {
         "tags": ["Auth"],
         "summary": "Login setzen, ändern, ein- oder ausschalten",
-        "description": "Mit new_password: setzt Benutzername und Passwort (mindestens 8 Zeichen); ein erstes Passwort schaltet den Login ein, eine Änderung behält den Ein/Aus-Zustand. Ohne new_password: enabled=false schaltet den Login aus und behält die Zugangsdaten (disable=true ist die ältere Schreibweise), enabled=true schaltet ihn mit dem gespeicherten Passwort wieder ein (400 ohne gespeichertes Passwort). Bei eingeschaltetem Login und beim Einschalten muss current_password stimmen (sonst 403, zählt als Fehlversuch). Das Passwort wird als bcrypt-Hash gespeichert. Alle bestehenden Sessions werden beendet; bei eingeschaltetem Login erhält der Aufrufer ein neues Session-Cookie.",
+        "description": "Mit new_password: setzt Benutzername und Passwort (mindestens 8 Zeichen); ein erstes Passwort schaltet den Login ein, eine Änderung behält den Ein/Aus-Zustand. Ohne new_password: enabled=false schaltet den Login aus und behält die Zugangsdaten (disable=true ist die ältere Schreibweise), enabled=true schaltet ihn mit dem gespeicherten Passwort wieder ein (400 ohne gespeichertes Passwort). Nur trust_ingress (ohne new_password und enabled): legt fest, ob die Anmeldung bei Home Assistant in der Seitenleiste (Ingress) den Gateway-Login ersetzt; über Ingress ohne Passwort, direkt bei eingeschaltetem Login mit current_password; Sessions bleiben gültig. Bei eingeschaltetem Login und beim Einschalten muss current_password stimmen (sonst 403, zählt als Fehlversuch). Das Passwort wird als bcrypt-Hash gespeichert. Alle bestehenden Sessions werden beendet; bei eingeschaltetem Login erhält der Aufrufer ein neues Session-Cookie.",
         "requestBody": {
           "required": true,
           "content": {
@@ -185,7 +188,8 @@ const openAPISpec = `{
                   "current_password": { "type": "string", "format": "password", "description": "Pflicht bei eingeschaltetem Login und beim Einschalten" },
                   "new_password": { "type": "string", "format": "password", "minLength": 8 },
                   "enabled": { "type": "boolean", "description": "Login ein- oder ausschalten; die Zugangsdaten bleiben gespeichert" },
-                  "disable": { "type": "boolean", "description": "Veraltet: wie enabled=false" }
+                  "disable": { "type": "boolean", "description": "Veraltet: wie enabled=false" },
+                  "trust_ingress": { "type": "boolean", "description": "Home-Assistant-Anmeldung in der Seitenleiste übernehmen (Standard true, gespeichert als auth.ingress_login_required)" }
                 }
               }
             }
