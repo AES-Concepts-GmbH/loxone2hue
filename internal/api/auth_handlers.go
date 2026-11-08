@@ -19,6 +19,7 @@ func (h *Handlers) AuthStatus(w http.ResponseWriter, r *http.Request) {
 	authenticated := !auth.Enabled() || hasValidSession(r)
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"enabled":       auth.Enabled(),
+		"configured":    auth.Configured(),
 		"username":      auth.User(),
 		"authenticated": authenticated,
 	})
@@ -72,11 +73,21 @@ func (h *Handlers) Logout(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-// UpdateAuth sets, changes or disables the login from the settings page.
+// UpdateAuth sets or changes the password and switches the login on or off
+// from the settings page.
 //
-// With a login active, the current password has to be supplied; a wrong one
-// counts as a failed login for the throttling. Every other browser session is
-// logged out afterwards, the caller receives a fresh one.
+//   - {"new_password", "username"}: sets or changes the password. A first
+//     password switches the protection on; changing it keeps the current
+//     on/off state.
+//   - {"enabled": false}: switches the protection off and keeps the
+//     credentials ("disable": true is the older spelling).
+//   - {"enabled": true}: switches it on again with the stored password.
+//
+// While the protection is on, the current password has to be supplied; a
+// wrong one counts as a failed login for the throttling. Switching on with
+// the stored password also checks it, so nobody locks themselves out with a
+// password they no longer know. Every browser session is logged out
+// afterwards; with the protection on, the caller receives a fresh one.
 func (h *Handlers) UpdateAuth(w http.ResponseWriter, r *http.Request) {
 	mutationMu.Lock()
 	defer mutationMu.Unlock()
@@ -84,70 +95,108 @@ func (h *Handlers) UpdateAuth(w http.ResponseWriter, r *http.Request) {
 		Username        string `json:"username"`
 		CurrentPassword string `json:"current_password"`
 		NewPassword     string `json:"new_password"`
+		Enabled         *bool  `json:"enabled"`
 		Disable         bool   `json:"disable"`
 	}
 	if !decodeJSON(w, r, &req, "invalid request body") {
 		return
 	}
-
-	current := config.GetAuth()
-	if current.Enabled() {
-		ip := clientIP(r)
-		if wait, blocked := limiter.blocked(ip); blocked {
-			tooManyAttempts(w, wait)
-			return
-		}
-		if !current.Verify(req.CurrentPassword) {
-			limiter.failure(ip)
-			errorResponse(w, http.StatusForbidden, "current password is wrong")
-			return
-		}
-		limiter.success(ip)
+	if req.Disable {
+		off := false
+		req.Enabled = &off
 	}
 
-	var next config.AuthConfig
-	if !req.Disable {
+	current := config.GetAuth()
+	toggleOnly := req.NewPassword == "" && req.Enabled != nil
+	switchOn := toggleOnly && *req.Enabled
+
+	if switchOn && !current.Configured() {
+		errorResponse(w, http.StatusBadRequest, "no password set: set a password to enable the login")
+		return
+	}
+	if current.Enabled() || switchOn {
+		if !verifyCurrentPassword(w, r, current, req.CurrentPassword) {
+			return
+		}
+	}
+
+	next := current
+	if toggleOnly {
+		next.Disabled = !*req.Enabled
+	} else {
 		if len(req.NewPassword) < minPasswordLength {
 			errorResponse(w, http.StatusBadRequest, "new password must have at least 8 characters")
+			return
+		}
+		hash, err := config.HashPassword(req.NewPassword)
+		if err != nil {
+			errorResponse(w, http.StatusBadRequest, "password cannot be hashed")
 			return
 		}
 		username := strings.TrimSpace(req.Username)
 		if username == "" {
 			username = current.User()
 		}
-		next = config.AuthConfig{Username: username, Password: req.NewPassword}
+		// A first password switches the protection on; a change keeps the state.
+		disabled := current.Configured() && current.Disabled
+		if req.Enabled != nil {
+			disabled = !*req.Enabled
+		}
+		next = config.AuthConfig{Username: username, PasswordHash: hash, Disabled: disabled}
 	}
 
-	if next.Password != "" {
-		hash, err := config.HashPassword(next.Password)
-		if err != nil {
-			errorResponse(w, http.StatusBadRequest, "password cannot be hashed")
-			return
-		}
-		next.PasswordHash, next.Password = hash, ""
-	}
 	candidate := config.Snapshot()
 	candidate.Auth = next
 	if !commitConfig(w, candidate) {
 		return
 	}
 
-	// Old sessions belong to the old password.
+	// Old sessions belong to the old password or the old state.
 	sessions.revokeAll()
 
-	if req.Disable {
+	switch {
+	case toggleOnly && next.Enabled():
+		log.Info().Str("user", next.User()).Msg("Login protection enabled via settings")
+	case toggleOnly:
+		log.Info().Msg("Login protection disabled via settings (credentials kept)")
+	default:
+		log.Info().Str("user", next.User()).Bool("enabled", next.Enabled()).Msg("Login password changed via settings")
+	}
+
+	if !next.Enabled() {
 		clearSessionCookie(w)
-		log.Info().Msg("Login protection disabled via settings")
-		jsonResponse(w, http.StatusOK, map[string]interface{}{"status": "ok", "enabled": false})
+		jsonResponse(w, http.StatusOK, map[string]interface{}{
+			"status":     "ok",
+			"enabled":    false,
+			"configured": next.Configured(),
+			"username":   next.User(),
+		})
 		return
 	}
 
 	token, expires := sessions.create()
 	setSessionCookie(w, r, token, expires)
-	log.Info().Str("user", next.User()).Msg("Login password changed via settings")
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
-		"status":   "ok",
-		"enabled":  true,
-		"username": next.User(),
+		"status":     "ok",
+		"enabled":    true,
+		"configured": true,
+		"username":   next.User(),
 	})
+}
+
+// verifyCurrentPassword checks the password confirming a change, throttled
+// like a login. It answers the request itself when the check fails.
+func verifyCurrentPassword(w http.ResponseWriter, r *http.Request, auth config.AuthConfig, password string) bool {
+	ip := clientIP(r)
+	if wait, blocked := limiter.blocked(ip); blocked {
+		tooManyAttempts(w, wait)
+		return false
+	}
+	if !auth.Verify(password) {
+		limiter.failure(ip)
+		errorResponse(w, http.StatusForbidden, "current password is wrong")
+		return false
+	}
+	limiter.success(ip)
+	return true
 }

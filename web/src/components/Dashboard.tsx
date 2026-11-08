@@ -54,6 +54,7 @@ export function Dashboard({ authEnabled, onLogout, onAuthChanged }: DashboardPro
   const [mappings, setMappings] = useState<Mapping[]>([]);
   const [udpSendAll, setUdpSendAll] = useState(false);
   const [serverPort, setServerPort] = useState<number | undefined>();
+  const [authUsername, setAuthUsername] = useState<string | undefined>();
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(10);
   const [showIntervalMenu, setShowIntervalMenu] = useState(false);
   const intervalMenuRef = useRef<HTMLDivElement>(null);
@@ -93,6 +94,7 @@ export function Dashboard({ authEnabled, onLogout, onAuthChanged }: DashboardPro
           setBridgeIP(config.hue.bridge_ip);
         }
         setServerPort(config.server?.port);
+        setAuthUsername(config.auth?.username);
         setUdpSendAll(
           (config.loxone?.miniservers || []).some(
             (ms) => ms.udp_enabled && ms.send_all
@@ -454,9 +456,15 @@ export function Dashboard({ authEnabled, onLogout, onAuthChanged }: DashboardPro
           />
         )}
 
-        {activeTab === 'settings' && <SettingsPanel authEnabled={authEnabled} onAuthChanged={onAuthChanged} />}
+        {activeTab === 'settings' && <SettingsPanel
+            authEnabled={authEnabled}
+            onAuthChanged={(enabled, username) => {
+              if (username) setAuthUsername(username);
+              onAuthChanged(enabled);
+            }}
+          />}
 
-        {activeTab === 'guide' && <LoxoneGuide gatewayPort={serverPort} />}
+        {activeTab === 'guide' && <LoxoneGuide gatewayPort={serverPort} authEnabled={authEnabled} authUsername={authUsername} />}
 
         {activeTab === 'api' && (
           <div className="bg-gray-800 rounded-xl overflow-hidden h-[calc(100vh-220px)]">

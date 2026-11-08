@@ -43,7 +43,8 @@ function generateId(): string {
 
 interface SettingsPanelProps {
   authEnabled: boolean;
-  onAuthChanged: (enabled: boolean) => void;
+  /** Called after the login was switched on/off or its credentials changed. */
+  onAuthChanged: (enabled: boolean, username?: string) => void;
 }
 
 export function SettingsPanel({ authEnabled, onAuthChanged }: SettingsPanelProps) {
@@ -53,6 +54,10 @@ export function SettingsPanel({ authEnabled, onAuthChanged }: SettingsPanelProps
 
   // Login-Schutz
   const [authUsername, setAuthUsername] = useState('admin');
+  const [authConfigured, setAuthConfigured] = useState(authEnabled);
+  /** Target state of the on/off switch while its password confirmation is open. */
+  const [pendingToggle, setPendingToggle] = useState<boolean | null>(null);
+  const [togglePassword, setTogglePassword] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordRepeat, setNewPasswordRepeat] = useState('');
@@ -127,6 +132,7 @@ export function SettingsPanel({ authEnabled, onAuthChanged }: SettingsPanelProps
     try {
       const config = await api.getConfig();
       if (config.auth?.username) setAuthUsername(config.auth.username);
+      setAuthConfigured(Boolean(config.auth?.configured ?? config.auth?.enabled));
       setLoxoneConfig({
         miniservers: config.loxone?.miniservers || [],
       });
@@ -288,8 +294,14 @@ export function SettingsPanel({ authEnabled, onAuthChanged }: SettingsPanelProps
       setCurrentPassword('');
       setNewPassword('');
       setNewPasswordRepeat('');
-      setAuthMessage({ type: 'success', text: authEnabled ? 'Passwort geändert.' : 'Login-Schutz aktiviert.' });
-      onAuthChanged(result.enabled);
+      const text = !authConfigured
+        ? 'Passwort festgelegt, Login-Schutz aktiviert.'
+        : result.enabled
+          ? 'Passwort geändert.'
+          : 'Passwort geändert. Der Login-Schutz bleibt ausgeschaltet.';
+      setAuthMessage({ type: 'success', text });
+      setAuthConfigured(true);
+      onAuthChanged(result.enabled, result.username);
     } catch (err) {
       setAuthMessage({ type: 'error', text: err instanceof Error ? err.message : 'Speichern fehlgeschlagen' });
     } finally {
@@ -297,18 +309,35 @@ export function SettingsPanel({ authEnabled, onAuthChanged }: SettingsPanelProps
     }
   };
 
-  const disableAuth = async () => {
+  const requestToggle = () => {
     if (authBusy) return;
-    if (!confirm('Login-Schutz wirklich ausschalten? Web-UI, API und Backups sind dann ohne Passwort erreichbar.')) return;
+    setAuthMessage(null);
+    setTogglePassword('');
+    if (!authEnabled && !authConfigured) {
+      setAuthMessage({ type: 'error', text: 'Lege zuerst unten ein Passwort fest, damit der Login-Schutz eingeschaltet werden kann.' });
+      return;
+    }
+    setPendingToggle(!authEnabled);
+  };
+
+  const confirmToggle = async () => {
+    if (authBusy || pendingToggle === null || !togglePassword) return;
+    const target = pendingToggle;
     setAuthBusy(true);
     setAuthMessage(null);
     try {
-      await api.updateAuth({ current_password: currentPassword, disable: true });
-      setCurrentPassword('');
-      setAuthMessage({ type: 'success', text: 'Login-Schutz ausgeschaltet.' });
-      onAuthChanged(false);
+      const result = await api.updateAuth({ enabled: target, current_password: togglePassword });
+      setPendingToggle(null);
+      setTogglePassword('');
+      setAuthMessage({
+        type: 'success',
+        text: result.enabled
+          ? 'Login-Schutz eingeschaltet. Loxone muss die Zugangsdaten jetzt in der Adresse des Virtuellen Ausgangs mitsenden.'
+          : 'Login-Schutz ausgeschaltet. Benutzername und Passwort bleiben gespeichert.',
+      });
+      onAuthChanged(result.enabled, result.username);
     } catch (err) {
-      setAuthMessage({ type: 'error', text: err instanceof Error ? err.message : 'Ausschalten fehlgeschlagen' });
+      setAuthMessage({ type: 'error', text: err instanceof Error ? err.message : 'Umschalten fehlgeschlagen' });
     } finally {
       setAuthBusy(false);
     }
@@ -329,19 +358,80 @@ export function SettingsPanel({ authEnabled, onAuthChanged }: SettingsPanelProps
 
       {/* Login-Schutz */}
       <div className="bg-gray-800 rounded-xl p-6 space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <h3 className="text-lg font-medium text-white">Login-Schutz</h3>
-          <span className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full ${authEnabled ? 'bg-green-900/40 text-green-300' : 'bg-yellow-900/40 text-yellow-300'}`}>
-            {authEnabled ? <ShieldCheck size={14} /> : <ShieldOff size={14} />}
-            {authEnabled ? 'Aktiv' : 'Aus'}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full ${authEnabled ? 'bg-green-900/40 text-green-300' : 'bg-yellow-900/40 text-yellow-300'}`}>
+              {authEnabled ? <ShieldCheck size={14} /> : <ShieldOff size={14} />}
+              {authEnabled ? 'Aktiv' : 'Aus'}
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={authEnabled}
+              aria-label="Login-Schutz ein- oder ausschalten"
+              onClick={requestToggle}
+              disabled={authBusy}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${authEnabled ? 'bg-green-600' : 'bg-gray-600'}`}
+            >
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${authEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
         </div>
         <p className="text-sm text-gray-400">
-          Mit Passwort verlangen Web-UI, API und WebSocket eine Anmeldung. Loxone übergibt die Zugangsdaten in der
-          Adresse des Virtuellen Ausgangs (<code className="text-xs">http://benutzer:passwort@gateway:port</code>).
-          Das Passwort wird nur als Hash gespeichert.
+          Mit eingeschaltetem Login-Schutz verlangen Web-UI, API und WebSocket eine Anmeldung. Loxone übergibt die
+          Zugangsdaten dann in der Adresse des Virtuellen Ausgangs (<code className="text-xs">http://benutzer:passwort@gateway:port</code>,
+          siehe Anleitung, Schritt 2). Ausgeschaltet bleiben Benutzername und Passwort gespeichert. Das Passwort wird nur als Hash gespeichert.
         </p>
 
+        {pendingToggle !== null && (
+          <form
+            className={`rounded-lg p-4 space-y-3 border ${pendingToggle ? 'bg-green-900/20 border-green-500/30' : 'bg-yellow-900/20 border-yellow-500/30'}`}
+            onSubmit={(e) => {
+              e.preventDefault();
+              confirmToggle();
+            }}
+          >
+            <p className={`text-sm ${pendingToggle ? 'text-green-300' : 'text-yellow-300'}`}>
+              {pendingToggle
+                ? `Login-Schutz mit dem gespeicherten Passwort für „${authUsername || 'admin'}“ einschalten. Danach braucht der Miniserver die Zugangsdaten in der Adresse des Virtuellen Ausgangs.`
+                : 'Login-Schutz ausschalten? Web-UI, API, Befehle und Backups sind dann ohne Passwort im Netz erreichbar. Benutzername und Passwort bleiben gespeichert.'}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="password"
+                autoComplete="current-password"
+                autoFocus
+                placeholder="Passwort bestätigen"
+                value={togglePassword}
+                onChange={(e) => setTogglePassword(e.target.value)}
+                className="flex-1 min-w-[180px] bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-hue-orange focus:outline-none placeholder-gray-500 text-sm"
+              />
+              <button
+                type="submit"
+                disabled={authBusy || !togglePassword}
+                className={`flex items-center gap-2 font-medium px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${pendingToggle ? 'bg-green-600 hover:bg-green-500 text-white' : 'bg-yellow-600 hover:bg-yellow-500 text-gray-900'}`}
+              >
+                {pendingToggle ? <ShieldCheck size={16} /> : <ShieldOff size={16} />}
+                {pendingToggle ? 'Einschalten' : 'Ausschalten'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingToggle(null);
+                  setTogglePassword('');
+                }}
+                className="bg-gray-700 hover:bg-gray-600 text-gray-200 px-4 py-2 rounded-lg text-sm transition-colors"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </form>
+        )}
+
+        <h4 className="text-sm font-medium text-gray-300 pt-2">
+          {authConfigured ? 'Zugangsdaten ändern' : 'Passwort festlegen'}
+        </h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-sm text-gray-400 mb-1">Benutzername</label>
@@ -386,6 +476,9 @@ export function SettingsPanel({ authEnabled, onAuthChanged }: SettingsPanelProps
             />
           </div>
         </div>
+        <p className="text-xs text-gray-500">
+          Für die Loxone-Adresse keine Zeichen wie <code>@ : / # ?</code> in Benutzername oder Passwort verwenden.
+        </p>
 
         {authMessage && (
           <div className={`flex items-center gap-2 text-sm ${authMessage.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
@@ -401,18 +494,8 @@ export function SettingsPanel({ authEnabled, onAuthChanged }: SettingsPanelProps
             className="flex items-center gap-2 bg-hue-orange hover:bg-orange-400 text-gray-900 font-medium px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save size={16} />
-            {authEnabled ? 'Passwort ändern' : 'Login-Schutz aktivieren'}
+            {authConfigured ? 'Passwort ändern' : 'Passwort festlegen und Login-Schutz aktivieren'}
           </button>
-          {authEnabled && (
-            <button
-              onClick={disableAuth}
-              disabled={authBusy || !currentPassword}
-              className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-gray-200 px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ShieldOff size={16} />
-              Login-Schutz ausschalten
-            </button>
-          )}
         </div>
       </div>
 

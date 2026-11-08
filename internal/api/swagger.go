@@ -119,7 +119,8 @@ const openAPISpec = `{
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "enabled": { "type": "boolean" },
+                    "enabled": { "type": "boolean", "description": "Login-Schutz eingeschaltet" },
+                    "configured": { "type": "boolean", "description": "Passwort gespeichert (auch wenn ausgeschaltet)" },
                     "username": { "type": "string", "example": "admin" },
                     "authenticated": { "type": "boolean" }
                   }
@@ -171,8 +172,8 @@ const openAPISpec = `{
     "/auth": {
       "put": {
         "tags": ["Auth"],
-        "summary": "Login setzen, ändern oder ausschalten",
-        "description": "Setzt Benutzername und Passwort (mindestens 8 Zeichen) oder schaltet den Login mit disable=true aus. Bei aktivem Login muss current_password stimmen (sonst 403, zählt als Fehlversuch). Das Passwort wird als bcrypt-Hash gespeichert. Alle bestehenden Sessions werden beendet; der Aufrufer erhält ein neues Session-Cookie.",
+        "summary": "Login setzen, ändern, ein- oder ausschalten",
+        "description": "Mit new_password: setzt Benutzername und Passwort (mindestens 8 Zeichen); ein erstes Passwort schaltet den Login ein, eine Änderung behält den Ein/Aus-Zustand. Ohne new_password: enabled=false schaltet den Login aus und behält die Zugangsdaten (disable=true ist die ältere Schreibweise), enabled=true schaltet ihn mit dem gespeicherten Passwort wieder ein (400 ohne gespeichertes Passwort). Bei eingeschaltetem Login und beim Einschalten muss current_password stimmen (sonst 403, zählt als Fehlversuch). Das Passwort wird als bcrypt-Hash gespeichert. Alle bestehenden Sessions werden beendet; bei eingeschaltetem Login erhält der Aufrufer ein neues Session-Cookie.",
         "requestBody": {
           "required": true,
           "content": {
@@ -181,9 +182,10 @@ const openAPISpec = `{
                 "type": "object",
                 "properties": {
                   "username": { "type": "string", "description": "Leer = bisheriger Benutzername (Standard admin)" },
-                  "current_password": { "type": "string", "format": "password", "description": "Pflicht, wenn ein Login aktiv ist" },
+                  "current_password": { "type": "string", "format": "password", "description": "Pflicht bei eingeschaltetem Login und beim Einschalten" },
                   "new_password": { "type": "string", "format": "password", "minLength": 8 },
-                  "disable": { "type": "boolean", "description": "true schaltet den Login aus" }
+                  "enabled": { "type": "boolean", "description": "Login ein- oder ausschalten; die Zugangsdaten bleiben gespeichert" },
+                  "disable": { "type": "boolean", "description": "Veraltet: wie enabled=false" }
                 }
               }
             }
@@ -199,13 +201,14 @@ const openAPISpec = `{
                   "properties": {
                     "status": { "type": "string", "example": "ok" },
                     "enabled": { "type": "boolean" },
+                    "configured": { "type": "boolean" },
                     "username": { "type": "string" }
                   }
                 }
               }
             }
           },
-          "400": { "description": "Neues Passwort zu kurz", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "400": { "description": "Neues Passwort zu kurz oder Einschalten ohne gespeichertes Passwort", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
           "403": { "description": "Aktuelles Passwort falsch", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
           "429": { "description": "Adresse gesperrt", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
         }

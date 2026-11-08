@@ -1,14 +1,23 @@
-import { BookOpen, Settings, Code, Link2, Terminal, Lightbulb, Home, Play, CheckCircle2, AlertTriangle, Zap, HelpCircle, Layers, Radio, Download } from 'lucide-react';
+import { BookOpen, Settings, Code, Link2, Terminal, Lightbulb, Home, Play, CheckCircle2, AlertTriangle, Zap, HelpCircle, Layers, Radio, Download, ShieldCheck, ShieldOff } from 'lucide-react';
 
 interface LoxoneGuideProps {
   /** Port the gateway listens on (from the server config); falls back to the page's port. */
   gatewayPort?: number;
+  /** The login protection is switched on: Loxone has to send credentials. */
+  authEnabled?: boolean;
+  authUsername?: string;
 }
 
-export function LoxoneGuide({ gatewayPort }: LoxoneGuideProps) {
+export function LoxoneGuide({ gatewayPort, authEnabled = false, authUsername }: LoxoneGuideProps) {
   const gatewayHost = window.location.hostname;
   const port = gatewayPort ?? (window.location.port ? Number(window.location.port) : 8080);
   const gatewayUrl = `${gatewayHost}:${port}`;
+  const authUser = authUsername || 'admin';
+  // Address of the Virtual Output: with the login on, Loxone sends the
+  // credentials from the address as Basic Auth with every command.
+  const virtualOutAddress = authEnabled
+    ? `http://${authUser}:<passwort>@${gatewayUrl}`
+    : `http://${gatewayUrl}`;
 
   return (
     <div className="space-y-8 max-w-4xl">
@@ -245,10 +254,54 @@ export function LoxoneGuide({ gatewayPort }: LoxoneGuideProps) {
         <div className="space-y-6 text-gray-300">
           <div>
             <h4 className="font-medium text-white mb-3">2.1 Virtuellen Ausgang erstellen</h4>
+
+            {authEnabled ? (
+              <div className="mb-4 p-4 bg-yellow-900/30 border border-yellow-500/30 rounded-lg">
+                <h5 className="text-sm font-medium text-yellow-400 mb-2 flex items-center gap-2">
+                  <ShieldCheck size={16} />
+                  Login-Schutz ist eingeschaltet: Der Miniserver muss sich anmelden
+                </h5>
+                <ul className="text-xs text-yellow-200/90 space-y-1.5">
+                  <li>
+                    • Benutzername und Passwort gehören in die <strong>Adresse</strong> des Virtuellen Ausgangs
+                    (<code className="bg-yellow-900/50 px-1 rounded">http://{authUser}:&lt;passwort&gt;@{gatewayUrl}</code>).
+                    Loxone sendet sie bei jedem Befehl als HTTP Basic Auth mit.
+                  </li>
+                  <li>
+                    • <code className="bg-yellow-900/50 px-1 rounded">&lt;passwort&gt;</code> durch das Passwort aus
+                    Einstellungen → Login-Schutz ersetzen. Zeichen wie <code className="bg-yellow-900/50 px-1 rounded">@ : / # ?</code> im
+                    Passwort zerlegen die Adresse falsch, besser ein Passwort ohne diese Zeichen wählen.
+                  </li>
+                  <li>
+                    • Ohne oder mit falschen Zugangsdaten antwortet das Gateway mit <strong>401</strong>. Nach 5 Fehlversuchen wird
+                    die Adresse des Miniservers gesperrt (30 s, danach jeweils doppelt so lang, höchstens 1 Stunde, Antwort
+                    <strong> 429</strong>), auch für das richtige Passwort.
+                  </li>
+                  <li>
+                    • Der Login-Schutz lässt sich unter <strong>Einstellungen → Login-Schutz</strong> ausschalten. Dann entfällt die
+                    Anmeldung und die Adresse braucht keine Zugangsdaten.
+                  </li>
+                </ul>
+              </div>
+            ) : (
+              <div className="mb-4 p-4 bg-gray-900 border border-gray-700 rounded-lg">
+                <h5 className="text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+                  <ShieldOff size={16} className="text-yellow-500" />
+                  Login-Schutz ist ausgeschaltet: Keine Zugangsdaten nötig
+                </h5>
+                <p className="text-xs text-gray-400">
+                  Die Adresse enthält nur Gateway-IP und Port. Befehle sind damit für jedes Gerät im Netz ohne Anmeldung
+                  ausführbar. Wird der Login-Schutz unter <strong>Einstellungen → Login-Schutz</strong> eingeschaltet, muss die
+                  Adresse auf <code className="bg-gray-800 px-1 rounded">http://{authUser}:&lt;passwort&gt;@{gatewayUrl}</code> geändert
+                  werden, sonst weist das Gateway die Befehle ab (401).
+                </p>
+              </div>
+            )}
+
             <ol className="list-decimal list-inside space-y-2 text-sm ml-4">
               <li>Öffne <strong>Loxone Config</strong></li>
               <li>Erstelle einen neuen <strong>Virtuellen Ausgang</strong></li>
-              <li>Konfiguriere die Adresse: <code className="bg-gray-900 px-2 py-0.5 rounded">http://{gatewayUrl}</code></li>
+              <li>Konfiguriere die Adresse: <code className="bg-gray-900 px-2 py-0.5 rounded break-all">{virtualOutAddress}</code></li>
               <li>Speichere den Virtuellen Ausgang</li>
             </ol>
           </div>
@@ -548,8 +601,8 @@ export function LoxoneGuide({ gatewayPort }: LoxoneGuideProps) {
             <div className="space-y-2 text-sm">
               <div>
                 <span className="text-gray-400">Adresse:</span>
-                <code className="block bg-gray-800 px-3 py-2 rounded mt-1 font-mono">
-                  http://{gatewayUrl}
+                <code className="block bg-gray-800 px-3 py-2 rounded mt-1 font-mono break-all">
+                  {virtualOutAddress}
                 </code>
               </div>
             </div>
@@ -841,6 +894,12 @@ export function LoxoneGuide({ gatewayPort }: LoxoneGuideProps) {
               <p>
                 <strong>Virtual HTTP Output:</strong> Im Peripheriebaum <strong>Virtuelle Ausgänge</strong> markieren.
               </p>
+              {authEnabled && (
+                <p>
+                  <strong>Login-Schutz aktiv:</strong> Die Vorlage enthält keine Zugangsdaten. Nach dem Import die Adresse des
+                  Virtuellen Ausgangs auf <code>http://{authUser}:&lt;passwort&gt;@{gatewayUrl}</code> ändern.
+                </p>
+              )}
             </div>
           </div>
 
@@ -903,8 +962,20 @@ export function LoxoneGuide({ gatewayPort }: LoxoneGuideProps) {
               </li>
               <li className="flex items-start gap-2">
                 <HelpCircle size={16} className="text-gray-500 mt-0.5 flex-shrink-0" />
-                <span>Teste die URL direkt im Browser: <code className="bg-gray-800 px-1 rounded">http://{gatewayUrl}/ws?cmd=SET test ON</code></span>
+                <span>Teste die URL direkt im Browser: <code className="bg-gray-800 px-1 rounded">http://{gatewayUrl}/ws?cmd=SET test ON</code>
+                  {authEnabled && ' (der Browser fragt dann nach Benutzername und Passwort des Login-Schutzes)'}</span>
               </li>
+              {authEnabled && (
+                <li className="flex items-start gap-2">
+                  <HelpCircle size={16} className="text-gray-500 mt-0.5 flex-shrink-0" />
+                  <span>
+                    Login-Schutz ist eingeschaltet: Enthält die Adresse des Virtuellen Ausgangs keine oder falsche Zugangsdaten,
+                    antwortet das Gateway mit 401 bzw. nach mehreren Fehlversuchen mit 429. Adresse auf{' '}
+                    <code className="bg-gray-800 px-1 rounded">http://{authUser}:&lt;passwort&gt;@{gatewayUrl}</code> prüfen
+                    oder den Login-Schutz in den Einstellungen ausschalten.
+                  </span>
+                </li>
+              )}
             </ul>
           </div>
 

@@ -274,8 +274,97 @@ func TestUpdateAuthFromSettings(t *testing.T) {
 	}
 	var body map[string]interface{}
 	_ = json.Unmarshal(rec.Body.Bytes(), &body)
-	if body["enabled"] != false {
+	if body["enabled"] != false || body["configured"] != true {
 		t.Errorf("disable response = %v", body)
+	}
+	if !config.GetAuth().Configured() || !config.GetAuth().Verify("nochgeheimer") {
+		t.Error("switching off dropped the stored credentials")
+	}
+}
+
+// TestToggleAuthKeepsCredentials covers the on/off switch: off keeps the
+// password, on again needs the stored password and hands out a session,
+// a password change while off keeps the protection off, and switching on
+// without any stored password is refused.
+func TestToggleAuthKeepsCredentials(t *testing.T) {
+	withAuth(t, "", "")
+	srv := newAuthTestServer(t)
+
+	put := func(body string, cookie *http.Cookie) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest("PUT", "/api/auth", strings.NewReader(body))
+		if cookie != nil {
+			req.AddCookie(cookie)
+		}
+		srv.router.ServeHTTP(rec, req)
+		return rec
+	}
+
+	if rec := put(`{"enabled":true}`, nil); rec.Code != 400 {
+		t.Errorf("enable without stored password: status %d, want 400", rec.Code)
+	}
+
+	rec := put(`{"username":"stefan","new_password":"geheim123"}`, nil)
+	if rec.Code != 200 {
+		t.Fatalf("set password: status %d %s", rec.Code, rec.Body.String())
+	}
+	cookie := sessionCookieFrom(t, rec)
+
+	if rec := put(`{"enabled":false,"current_password":"falsch"}`, cookie); rec.Code != 403 {
+		t.Errorf("switch off with wrong password: status %d, want 403", rec.Code)
+	}
+	rec = put(`{"enabled":false,"current_password":"geheim123"}`, cookie)
+	if rec.Code != 200 {
+		t.Fatalf("switch off: status %d %s", rec.Code, rec.Body.String())
+	}
+	auth := config.GetAuth()
+	if auth.Enabled() || !auth.Configured() || auth.User() != "stefan" {
+		t.Fatalf("after switching off: %+v", auth)
+	}
+
+	// Off means open: the API and the command endpoint need no credentials.
+	rec = httptest.NewRecorder()
+	srv.router.ServeHTTP(rec, httptest.NewRequest("GET", "/api/config", nil))
+	if rec.Code != 200 {
+		t.Errorf("API closed while switched off: status %d", rec.Code)
+	}
+	rec = httptest.NewRecorder()
+	srv.router.ServeHTTP(rec, httptest.NewRequest("GET", "/api/auth/status", nil))
+	if !strings.Contains(rec.Body.String(), `"enabled":false`) || !strings.Contains(rec.Body.String(), `"configured":true`) {
+		t.Errorf("status while switched off: %s", rec.Body.String())
+	}
+
+	// Switching on checks the stored password.
+	if rec := put(`{"enabled":true,"current_password":"falsch"}`, nil); rec.Code != 403 {
+		t.Errorf("switch on with wrong password: status %d, want 403", rec.Code)
+	}
+	if config.GetAuth().Enabled() {
+		t.Fatal("switched on despite the wrong password")
+	}
+
+	// A password change while off needs no current password and stays off.
+	rec = put(`{"new_password":"nochgeheimer"}`, nil)
+	if rec.Code != 200 {
+		t.Fatalf("change password while off: status %d %s", rec.Code, rec.Body.String())
+	}
+	if auth := config.GetAuth(); auth.Enabled() || !auth.Verify("nochgeheimer") || auth.User() != "stefan" {
+		t.Errorf("after change while off: enabled=%v user=%s", auth.Enabled(), auth.User())
+	}
+
+	rec = put(`{"enabled":true,"current_password":"nochgeheimer"}`, nil)
+	if rec.Code != 200 {
+		t.Fatalf("switch on: status %d %s", rec.Code, rec.Body.String())
+	}
+	if !config.GetAuth().Enabled() {
+		t.Error("not enabled after switching on")
+	}
+	if sessionCookieFrom(t, rec) == nil {
+		t.Error("switching on issued no session for the caller")
+	}
+	rec = httptest.NewRecorder()
+	srv.router.ServeHTTP(rec, httptest.NewRequest("GET", "/ws?cmd=GET%20x%20STATUS", nil))
+	if rec.Code != 401 {
+		t.Errorf("command endpoint open after switching on: status %d", rec.Code)
 	}
 }
 
