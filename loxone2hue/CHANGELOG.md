@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.5
+
+- Mappings: Bei eingeschaltetem Login-Schutz kopiert "Volle URL" die Adresse mit Benutzername und Passwort-Platzhalter (z. B. http://admin:<passwort>@10.1.19.47:8080/ws?cmd=SET%20buero%20ON); der Platzhalter wird durch das Passwort ersetzt. Ohne Login-Schutz bleibt die URL ohne Zugangsdaten
+
 ## 1.5.4
 
 - Login-Schutz: Schalter in Einstellungen > Login-Schutz zum Aus- und Wiedereinschalten. Ausschalten behaelt Benutzername und Passwort (neu: auth.disabled), Einschalten nutzt das gespeicherte Passwort; beide Richtungen verlangen die Bestaetigung mit dem Passwort. Bisher loeschte das Ausschalten die Zugangsdaten

@@ -158,19 +158,32 @@ function buildTestUrl(cmd: string): string {
   return `./ws?cmd=${encodeURIComponent(cmd)}`;
 }
 
+/** Placeholder for the login password in URLs shown to the user; the real one is only stored as a hash. */
+export const PASSWORD_PLACEHOLDER = '<passwort>';
+
+export interface ExternalUrlOptions {
+  /** Port the gateway listens on; falls back to the page's port. */
+  gatewayPort?: number;
+  /** Username of the login protection when it is switched on; adds `user:<passwort>@`. */
+  authUser?: string;
+}
+
 /**
  * Turns a relative test URL into an absolute one an external client (curl,
  * another browser, the Miniserver) can call directly on the gateway port.
  * Like the Loxone export, it uses the page's hostname with the configured
  * server port, so it bypasses a reverse proxy such as Home Assistant Ingress.
+ * With the login protection on, the URL carries the username and a password
+ * placeholder the user replaces.
  */
 export function buildExternalUrl(
   relativeUrl: string,
-  gatewayPort: number | undefined,
+  { gatewayPort, authUser }: ExternalUrlOptions = {},
   location: Pick<Location, 'protocol' | 'hostname' | 'port'> = window.location,
 ): string {
   const port = gatewayPort ?? (location.port ? Number(location.port) : undefined);
-  const origin = `${location.protocol}//${location.hostname}${port ? `:${port}` : ''}`;
+  const credentials = authUser ? `${encodeURIComponent(authUser)}:${PASSWORD_PLACEHOLDER}@` : '';
+  const origin = `${location.protocol}//${credentials}${location.hostname}${port ? `:${port}` : ''}`;
   return `${origin}/${relativeUrl.replace(/^\.?\//, '')}`;
 }
 

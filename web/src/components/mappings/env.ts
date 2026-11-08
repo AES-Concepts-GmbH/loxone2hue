@@ -9,6 +9,8 @@ export interface MappingEnv extends HueResources {
   hasHTTP: boolean;
   /** Port the gateway listens on (server config), used to build URLs for external clients. */
   gatewayPort?: number;
+  /** Username of the login protection while it is switched on, else undefined. */
+  authUser?: string;
 }
 
 export function errorMessage(err: unknown, fallback: string): string {
