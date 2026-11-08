@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.8
+
+- Login-Schutz: In der Home-Assistant-Seitenleiste (Ingress) ist keine zusaetzliche Anmeldung mehr noetig, auch das Anmeldefenster des Browsers entfaellt. Das Add-on bedient Ingress auf einem eigenen internen Port (18099), der nur Anfragen des Supervisors (172.30.32.2) annimmt; Home Assistant hat den Benutzer dort bereits angemeldet. Port 8080 fuer Loxone und den direkten Aufruf verlangt weiterhin Benutzername und Passwort
+- Einstellungen > Login-Schutz: Schalter "Home-Assistant-Anmeldung uebernehmen" (Standard ein, neu: auth.ingress_login_required). Ueber die Seitenleiste ohne Passwort umschaltbar, beim direkten Aufruf mit Passwort-Bestaetigung. In der Seitenleiste wird der angemeldete Home-Assistant-Benutzer angezeigt und "Abmelden" ausgeblendet
+- API: GET /api/auth/status meldet ingress, ha_login und ha_user; PUT /api/auth versteht trust_ingress; GET /api/config meldet auth.trust_ingress. Neue Startoptionen -ingress-port und -ingress-proxy
+
 ## 1.5.7
 
 - Anleitung: Kopier-Buttons fuer die Adresse des Virtuellen Ausgangs (Schritt 2.1 und Praxis-Beispiel), die Test-URL im Troubleshooting und alle Beispiel-Befehle (/ws?cmd=...). Bei eingeschaltetem Login-Schutz fragen die Adress-Buttons wie bei "Volle URL" das Passwort ab (nicht gespeichert, Vorschau maskiert); ein einmal eingegebenes Passwort gilt fuer alle Adressen der Anleitung, bis sie verlassen wird

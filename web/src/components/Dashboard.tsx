@@ -41,12 +41,20 @@ type Tab = 'devices' | 'rooms' | 'zones' | 'scenes' | 'sensors' | 'mappings' | '
 interface DashboardProps {
   /** Whether the gateway currently requires a login. */
   authEnabled: boolean;
+  /** Opened in the Home Assistant sidebar (Ingress). */
+  viaIngress?: boolean;
+  /** Signed in through Home Assistant; logging out of the gateway is pointless then. */
+  haLogin?: boolean;
+  /** Home Assistant user, when known. */
+  haUser?: string;
   onLogout: () => void;
+  /** Called when the Home Assistant sign-in setting was switched. */
+  onIngressTrustChanged?: (trust: boolean) => void;
   /** Called when the login was enabled, changed or disabled in the settings. */
   onAuthChanged: (enabled: boolean) => void;
 }
 
-export function Dashboard({ authEnabled, onLogout, onAuthChanged }: DashboardProps) {
+export function Dashboard({ authEnabled, viaIngress = false, haLogin = false, haUser = '', onLogout, onAuthChanged, onIngressTrustChanged }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<Tab>('guide');
   const [menuOpen, setMenuOpen] = useState(false);
   const [showReleaseNotes, setShowReleaseNotes] = useState(false);
@@ -271,7 +279,7 @@ export function Dashboard({ authEnabled, onLogout, onAuthChanged }: DashboardPro
                 )}
               </div>
 
-              {authEnabled && (
+              {authEnabled && !haLogin && (
                 <button
                   onClick={onLogout}
                   className="hidden sm:flex items-center gap-1 p-2 text-gray-400 hover:text-white transition-colors"
@@ -346,7 +354,7 @@ export function Dashboard({ authEnabled, onLogout, onAuthChanged }: DashboardPro
                   )}
                 </button>
               ))}
-              {authEnabled && (
+              {authEnabled && !haLogin && (
                 <button
                   onClick={onLogout}
                   className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:bg-gray-700 transition-colors"
@@ -458,6 +466,10 @@ export function Dashboard({ authEnabled, onLogout, onAuthChanged }: DashboardPro
 
         {activeTab === 'settings' && <SettingsPanel
             authEnabled={authEnabled}
+            viaIngress={viaIngress}
+            haLogin={haLogin}
+            haUser={haUser}
+            onIngressTrustChanged={onIngressTrustChanged}
             onAuthChanged={(enabled, username) => {
               if (username) setAuthUsername(username);
               onAuthChanged(enabled);

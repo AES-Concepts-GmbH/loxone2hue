@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Settings, Radio, Globe, Save, CheckCircle, AlertCircle, ScrollText, Search, RefreshCw, Plus, Trash2, Download, Upload, RotateCcw, Archive, Clock, ShieldCheck, ShieldOff } from 'lucide-react';
+import { Settings, Radio, Globe, Save, CheckCircle, AlertCircle, ScrollText, Search, RefreshCw, Plus, Trash2, Download, Upload, RotateCcw, Archive, Clock, ShieldCheck, ShieldOff, Home } from 'lucide-react';
 import * as api from '../services/api';
 import type { MiniserverConfig, LoxoneConfig, LogEntry, ConfigBackup, BackupSummary } from '../services/api';
 
@@ -43,11 +43,17 @@ function generateId(): string {
 
 interface SettingsPanelProps {
   authEnabled: boolean;
+  /** Opened in the Home Assistant sidebar (Ingress). */
+  viaIngress?: boolean;
+  /** Signed in through Home Assistant right now. */
+  haLogin?: boolean;
+  haUser?: string;
+  onIngressTrustChanged?: (trust: boolean) => void;
   /** Called after the login was switched on/off or its credentials changed. */
   onAuthChanged: (enabled: boolean, username?: string) => void;
 }
 
-export function SettingsPanel({ authEnabled, onAuthChanged }: SettingsPanelProps) {
+export function SettingsPanel({ authEnabled, viaIngress = false, haLogin = false, haUser = '', onIngressTrustChanged, onAuthChanged }: SettingsPanelProps) {
   const [loxoneConfig, setLoxoneConfig] = useState<LoxoneConfig>({
     miniservers: [],
   });
@@ -62,6 +68,9 @@ export function SettingsPanel({ authEnabled, onAuthChanged }: SettingsPanelProps
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordRepeat, setNewPasswordRepeat] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
+  const [trustIngress, setTrustIngress] = useState(true);
+  const [pendingIngress, setPendingIngress] = useState<boolean | null>(null);
+  const [ingressPassword, setIngressPassword] = useState('');
   const [authMessage, setAuthMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<'success' | 'error' | null>(null);
@@ -133,6 +142,7 @@ export function SettingsPanel({ authEnabled, onAuthChanged }: SettingsPanelProps
       const config = await api.getConfig();
       if (config.auth?.username) setAuthUsername(config.auth.username);
       setAuthConfigured(Boolean(config.auth?.configured ?? config.auth?.enabled));
+      setTrustIngress(config.auth?.trust_ingress ?? true);
       setLoxoneConfig({
         miniservers: config.loxone?.miniservers || [],
       });
@@ -309,6 +319,43 @@ export function SettingsPanel({ authEnabled, onAuthChanged }: SettingsPanelProps
     }
   };
 
+  const saveIngressTrust = async (target: boolean, password?: string) => {
+    setAuthBusy(true);
+    setAuthMessage(null);
+    try {
+      const result = await api.updateAuth({ trust_ingress: target, current_password: password });
+      const trust = result.trust_ingress ?? target;
+      setTrustIngress(trust);
+      setPendingIngress(null);
+      setIngressPassword('');
+      setAuthMessage({
+        type: 'success',
+        text: trust
+          ? 'In der Home-Assistant-Seitenleiste ist keine zusätzliche Anmeldung mehr nötig.'
+          : 'Auch in der Home-Assistant-Seitenleiste wird jetzt das Gateway-Passwort verlangt.',
+      });
+      onIngressTrustChanged?.(trust);
+    } catch (err) {
+      setAuthMessage({ type: 'error', text: err instanceof Error ? err.message : 'Umschalten fehlgeschlagen' });
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const requestIngressToggle = () => {
+    if (authBusy) return;
+    setAuthMessage(null);
+    const target = !trustIngress;
+    // In the sidebar Home Assistant has signed the user in; direct access
+    // confirms the password while the protection is on.
+    if (viaIngress || !authEnabled) {
+      saveIngressTrust(target);
+      return;
+    }
+    setIngressPassword('');
+    setPendingIngress(target);
+  };
+
   const requestToggle = () => {
     if (authBusy) return;
     setAuthMessage(null);
@@ -428,6 +475,74 @@ export function SettingsPanel({ authEnabled, onAuthChanged }: SettingsPanelProps
             </div>
           </form>
         )}
+
+        <div className="rounded-lg bg-gray-900/40 border border-gray-700 p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Home size={16}className="text-hue-orange flex-shrink-0" />
+              <h4 className="text-sm font-medium text-gray-200">Home-Assistant-Anmeldung übernehmen</h4>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={trustIngress}
+              aria-label="Home-Assistant-Anmeldung übernehmen"
+              onClick={requestIngressToggle}
+              disabled={authBusy}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${trustIngress ? 'bg-green-600' : 'bg-gray-600'}`}
+            >
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${trustIngress ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
+          <p className="text-sm text-gray-400">
+            Eingeschaltet braucht es in der Seitenleiste von Home Assistant keine zusätzliche Anmeldung: Home Assistant hat
+            dich dort schon angemeldet. Der Miniserver und der direkte Aufruf über die IP-Adresse und Port 8080 verlangen
+            bei eingeschaltetem Login-Schutz weiterhin Benutzername und Passwort.
+          </p>
+          {viaIngress && (
+            <p className="text-xs text-gray-500">
+              {haLogin
+                ? `Du bist über Home Assistant angemeldet${haUser ? ` als „${haUser}“` : ''}.`
+                : 'Du hast diese Seite über die Home-Assistant-Seitenleiste geöffnet.'}
+            </p>
+          )}
+          {pendingIngress !== null && (
+            <form
+              className="flex flex-wrap items-center gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (ingressPassword) saveIngressTrust(pendingIngress, ingressPassword);
+              }}
+            >
+              <input
+                type="password"
+                autoComplete="current-password"
+                autoFocus
+                placeholder="Passwort bestätigen"
+                value={ingressPassword}
+                onChange={(e) => setIngressPassword(e.target.value)}
+                className="flex-1 min-w-[180px] bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-hue-orange focus:outline-none placeholder-gray-500 text-sm"
+              />
+              <button
+                type="submit"
+                disabled={authBusy || !ingressPassword}
+                className="bg-hue-orange hover:bg-orange-400 text-gray-900 font-medium px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {pendingIngress ? 'Einschalten' : 'Ausschalten'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingIngress(null);
+                  setIngressPassword('');
+                }}
+                className="bg-gray-700 hover:bg-gray-600 text-gray-200 px-4 py-2 rounded-lg text-sm transition-colors"
+              >
+                Abbrechen
+              </button>
+            </form>
+          )}
+        </div>
 
         <h4 className="text-sm font-medium text-gray-300 pt-2">
           {authConfigured ? 'Zugangsdaten ändern' : 'Passwort festlegen'}

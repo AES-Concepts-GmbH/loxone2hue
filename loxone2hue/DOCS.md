@@ -46,6 +46,8 @@ Mappings verbinden Loxone IDs mit HUE Geräten:
 
 Das Add-on läuft mit `host_network`, die Web-UI und die API sind damit auf Port 8080 im ganzen LAN erreichbar, nicht nur über Ingress. Setze unter **Einstellungen → Login-Schutz** ein Passwort; die Web-UI zeigt bis dahin einen Warnhinweis. Loxone übergibt die Zugangsdaten danach in der Adresse des Virtuellen Ausgangs: `http://admin:<passwort>@<home-assistant-ip>:8080`. Über den Schalter im selben Abschnitt lässt sich der Schutz aus- und wieder einschalten, Benutzername und Passwort bleiben dabei gespeichert. Die Anleitung in der Web-UI (Schritt 2) zeigt die passende Adresse für den aktuellen Zustand.
 
+In der Seitenleiste von Home Assistant ist trotz Login-Schutz keine zweite Anmeldung nötig: Das Add-on übernimmt die Anmeldung bei Home Assistant. Ingress läuft dafür über einen eigenen internen Port, der nur Anfragen des Home Assistant Supervisors annimmt; der direkte Aufruf über Port 8080 und der Miniserver brauchen weiterhin Benutzername und Passwort. Mit dem Schalter **Home-Assistant-Anmeldung übernehmen** unter **Einstellungen → Login-Schutz** lässt sich das abschalten, dann verlangt auch die Seitenleiste das Gateway-Passwort.
+
 ### 5. Loxone konfigurieren
 
 Erstelle in Loxone Config:

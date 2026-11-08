@@ -80,6 +80,16 @@ type AuthConfig struct {
 	Password     string `yaml:"password,omitempty" json:"-"`
 	PasswordHash string `yaml:"password_hash,omitempty" json:"-"`
 	Disabled     bool   `yaml:"disabled,omitempty" json:"-"`
+	// IngressLoginRequired asks for the gateway password even in the Home
+	// Assistant sidebar. By default Ingress requests are trusted: Home
+	// Assistant has already signed the user in before proxying them.
+	IngressLoginRequired bool `yaml:"ingress_login_required,omitempty" json:"-"`
+}
+
+// TrustsIngress reports whether requests through Home Assistant Ingress skip
+// the gateway login.
+func (a AuthConfig) TrustsIngress() bool {
+	return !a.IngressLoginRequired
 }
 
 // Configured reports whether a password is stored, switched on or not.

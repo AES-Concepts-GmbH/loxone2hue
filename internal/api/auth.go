@@ -320,6 +320,12 @@ func authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
+		// Home Assistant signed the user in before proxying the request.
+		if auth.TrustsIngress() && isIngressRequest(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		if hasValidSession(r) {
 			next.ServeHTTP(w, r)
 			return
