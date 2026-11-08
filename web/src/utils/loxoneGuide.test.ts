@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Mapping } from '../types';
-import { buildExternalUrl, getLoxoneGuide, getSensorFeedbackInfo, getTestUrls } from './loxoneGuide';
+import { buildExternalUrl, buildGatewayAddress, getLoxoneGuide, getSensorFeedbackInfo, getTestUrls } from './loxoneGuide';
 
 function mapping(loxoneId: string, hueType: string, extra: Partial<Mapping> = {}): Mapping {
   return { id: loxoneId, name: loxoneId, loxone_id: loxoneId, hue_id: 'h', hue_type: hueType, enabled: true, ...extra };
@@ -85,5 +85,15 @@ describe('buildExternalUrl', () => {
       .toBe('http://admin:g3h%3Aim%40%231@10.1.19.47:8080/ws?cmd=X');
     expect(buildExternalUrl('./ws?cmd=X', { gatewayPort: 8080, authUser: 'admin', authPassword: '' }, ingress))
       .toBe('http://admin:<passwort>@10.1.19.47:8080/ws?cmd=X');
+  });
+});
+
+describe('buildGatewayAddress', () => {
+  const page = { protocol: 'http:', hostname: '10.1.19.47', port: '8123' };
+
+  it('builds the Virtual Output address with or without credentials', () => {
+    expect(buildGatewayAddress({ gatewayPort: 8080 }, page)).toBe('http://10.1.19.47:8080');
+    expect(buildGatewayAddress({ gatewayPort: 8080, authUser: 'admin' }, page)).toBe('http://admin:<passwort>@10.1.19.47:8080');
+    expect(buildGatewayAddress({ gatewayPort: 8080, authUser: 'admin', authPassword: 'a b' }, page)).toBe('http://admin:a%20b@10.1.19.47:8080');
   });
 });

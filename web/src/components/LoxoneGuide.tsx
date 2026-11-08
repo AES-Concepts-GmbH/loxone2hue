@@ -1,4 +1,8 @@
+import { useState } from 'react';
 import { BookOpen, Settings, Code, Link2, Terminal, Lightbulb, Home, Play, CheckCircle2, AlertTriangle, Zap, HelpCircle, Layers, Radio, Download, ShieldCheck, ShieldOff } from 'lucide-react';
+import { CopyButton } from './CopyButton';
+import { CopyableUrl } from './CopyableUrl';
+import { buildExternalUrl, buildGatewayAddress } from '../utils/loxoneGuide';
 
 interface LoxoneGuideProps {
   /** Port the gateway listens on (from the server config); falls back to the page's port. */
@@ -13,11 +17,21 @@ export function LoxoneGuide({ gatewayPort, authEnabled = false, authUsername }: 
   const port = gatewayPort ?? (window.location.port ? Number(window.location.port) : 8080);
   const gatewayUrl = `${gatewayHost}:${port}`;
   const authUser = authUsername || 'admin';
+  // Password for the copy buttons: page state only, never stored or sent.
+  const [password, setPassword] = useState('');
+  const urlOptions = { gatewayPort: port, authUser: authEnabled ? authUser : undefined };
   // Address of the Virtual Output: with the login on, Loxone sends the
   // credentials from the address as Basic Auth with every command.
-  const virtualOutAddress = authEnabled
-    ? `http://${authUser}:<passwort>@${gatewayUrl}`
-    : `http://${gatewayUrl}`;
+  const virtualOutAddress = (pw: string) => buildGatewayAddress({ ...urlOptions, authPassword: pw });
+  const testUrl = (pw: string) => buildExternalUrl('./ws?cmd=SET%20test%20ON', { ...urlOptions, authPassword: pw });
+  const copyableProps = { authUser: urlOptions.authUser, password, onPasswordChange: setPassword };
+  // A Loxone command with a plain copy button (relative, needs no credentials).
+  const command = (text: string) => (
+    <span className="flex items-center gap-2">
+      <code className="flex-1 bg-gray-800 px-3 py-1.5 rounded font-mono">{text}</code>
+      <CopyButton text={text} />
+    </span>
+  );
 
   return (
     <div className="space-y-8 max-w-4xl">
@@ -301,7 +315,12 @@ export function LoxoneGuide({ gatewayPort, authEnabled = false, authUsername }: 
             <ol className="list-decimal list-inside space-y-2 text-sm ml-4">
               <li>Öffne <strong>Loxone Config</strong></li>
               <li>Erstelle einen neuen <strong>Virtuellen Ausgang</strong></li>
-              <li>Konfiguriere die Adresse: <code className="bg-gray-900 px-2 py-0.5 rounded break-all">{virtualOutAddress}</code></li>
+              <li>
+                Konfiguriere die Adresse:
+                <div className="mt-1 ml-5">
+                  <CopyableUrl buildUrl={virtualOutAddress} {...copyableProps} />
+                </div>
+              </li>
               <li>Speichere den Virtuellen Ausgang</li>
             </ol>
           </div>
@@ -325,7 +344,7 @@ export function LoxoneGuide({ gatewayPort, authEnabled = false, authUsername }: 
                   </div>
                   <div className="grid grid-cols-[180px_1fr] gap-2 items-center">
                     <span className="text-gray-400">Befehl bei EIN:</span>
-                    <code className="bg-gray-800 px-3 py-1.5 rounded font-mono">/ws?cmd=SET buero_stefan ON</code>
+                    {command('/ws?cmd=SET buero_stefan ON')}
                   </div>
                   <div className="grid grid-cols-[180px_1fr] gap-2 items-center">
                     <span className="text-gray-400">HTTP Methode bei EIN:</span>
@@ -333,7 +352,7 @@ export function LoxoneGuide({ gatewayPort, authEnabled = false, authUsername }: 
                   </div>
                   <div className="grid grid-cols-[180px_1fr] gap-2 items-center">
                     <span className="text-gray-400">Befehl bei AUS:</span>
-                    <code className="bg-gray-800 px-3 py-1.5 rounded font-mono">/ws?cmd=SET buero_stefan OFF</code>
+                    {command('/ws?cmd=SET buero_stefan OFF')}
                   </div>
                   <div className="grid grid-cols-[180px_1fr] gap-2 items-center">
                     <span className="text-gray-400">HTTP Methode bei AUS:</span>
@@ -360,7 +379,7 @@ export function LoxoneGuide({ gatewayPort, authEnabled = false, authUsername }: 
                   </div>
                   <div className="grid grid-cols-[180px_1fr] gap-2 items-center">
                     <span className="text-gray-400">Befehl bei EIN:</span>
-                    <code className="bg-gray-800 px-3 py-1.5 rounded font-mono">/ws?cmd=SET buero_stefan BRI &lt;v&gt;</code>
+                    {command('/ws?cmd=SET buero_stefan BRI <v>')}
                   </div>
                   <div className="grid grid-cols-[180px_1fr] gap-2 items-center">
                     <span className="text-gray-400">HTTP Methode bei EIN:</span>
@@ -388,7 +407,7 @@ export function LoxoneGuide({ gatewayPort, authEnabled = false, authUsername }: 
                   </div>
                   <div className="grid grid-cols-[180px_1fr] gap-2 items-center">
                     <span className="text-gray-400">Befehl bei EIN:</span>
-                    <code className="bg-gray-800 px-3 py-1.5 rounded font-mono">/ws?cmd=SCENE sz_relax</code>
+                    {command('/ws?cmd=SCENE sz_relax')}
                   </div>
                   <div className="grid grid-cols-[180px_1fr] gap-2 items-center">
                     <span className="text-gray-400">HTTP Methode bei EIN:</span>
@@ -418,7 +437,7 @@ export function LoxoneGuide({ gatewayPort, authEnabled = false, authUsername }: 
                   </div>
                   <div className="grid grid-cols-[180px_1fr] gap-2 items-center">
                     <span className="text-gray-400">Befehl bei EIN:</span>
-                    <code className="bg-gray-800 px-3 py-1.5 rounded font-mono">/ws?cmd=MOOD wohnzimmer &lt;v&gt;</code>
+                    {command('/ws?cmd=MOOD wohnzimmer <v>')}
                   </div>
                   <div className="grid grid-cols-[180px_1fr] gap-2 items-center">
                     <span className="text-gray-400">HTTP Methode bei EIN:</span>
@@ -455,7 +474,7 @@ export function LoxoneGuide({ gatewayPort, authEnabled = false, authUsername }: 
                   </div>
                   <div className="grid grid-cols-[180px_1fr] gap-2 items-center">
                     <span className="text-gray-400">Befehl bei EIN:</span>
-                    <code className="bg-gray-800 px-3 py-1.5 rounded font-mono">/ws?cmd=SET buero_stefan CT &lt;v&gt;</code>
+                    {command('/ws?cmd=SET buero_stefan CT <v>')}
                   </div>
                   <div className="grid grid-cols-[180px_1fr] gap-2 items-center">
                     <span className="text-gray-400">HTTP Methode bei EIN:</span>
@@ -601,9 +620,13 @@ export function LoxoneGuide({ gatewayPort, authEnabled = false, authUsername }: 
             <div className="space-y-2 text-sm">
               <div>
                 <span className="text-gray-400">Adresse:</span>
-                <code className="block bg-gray-800 px-3 py-2 rounded mt-1 font-mono break-all">
-                  {virtualOutAddress}
-                </code>
+                <div className="mt-1">
+                  <CopyableUrl
+                    buildUrl={virtualOutAddress}
+                    {...copyableProps}
+                    codeClassName="bg-gray-800 px-3 py-2 rounded font-mono break-all"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -617,9 +640,7 @@ export function LoxoneGuide({ gatewayPort, authEnabled = false, authUsername }: 
               </div>
               <div>
                 <span className="text-gray-400">Befehl (Analog vom AQ-Ausgang):</span>
-                <code className="block bg-gray-800 px-3 py-2 rounded mt-1 font-mono">
-                  /ws?cmd=MOOD wohnzimmer &lt;v&gt;
-                </code>
+                <div className="mt-1">{command('/ws?cmd=MOOD wohnzimmer <v>')}</div>
               </div>
             </div>
           </div>
@@ -962,8 +983,13 @@ export function LoxoneGuide({ gatewayPort, authEnabled = false, authUsername }: 
               </li>
               <li className="flex items-start gap-2">
                 <HelpCircle size={16} className="text-gray-500 mt-0.5 flex-shrink-0" />
-                <span>Teste die URL direkt im Browser: <code className="bg-gray-800 px-1 rounded">http://{gatewayUrl}/ws?cmd=SET test ON</code>
-                  {authEnabled && ' (der Browser fragt dann nach Benutzername und Passwort des Login-Schutzes)'}</span>
+                <div className="flex-1">
+                  Teste die URL direkt im Browser
+                  {authEnabled && ' (mit Zugangsdaten in der URL oder der Browser fragt nach Benutzername und Passwort)'}:
+                  <div className="mt-1">
+                    <CopyableUrl buildUrl={testUrl} {...copyableProps} codeClassName="bg-gray-800 px-1 rounded break-all" />
+                  </div>
+                </div>
               </li>
               {authEnabled && (
                 <li className="flex items-start gap-2">

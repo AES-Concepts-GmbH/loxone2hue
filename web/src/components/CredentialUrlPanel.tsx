@@ -1,25 +1,24 @@
 import { useEffect, useState } from 'react';
 import { Check, Copy, Eye, EyeOff, X } from 'lucide-react';
-import { copyToClipboard } from '../../utils/clipboard';
-import { buildExternalUrl, PASSWORD_PLACEHOLDER } from '../../utils/loxoneGuide';
+import { copyToClipboard } from '../utils/clipboard';
+import { PASSWORD_PLACEHOLDER } from '../utils/loxoneGuide';
 
-interface FullUrlPanelProps {
-  /** Relative command URL (./ws?cmd=...). */
-  url: string;
-  gatewayPort?: number;
+interface CredentialUrlPanelProps {
+  /** Builds the URL for a typed password; an empty one yields the placeholder. */
+  buildUrl: (password: string) => string;
   authUser: string;
-  /** Password typed in this guide; lives only in component state, never stored. */
+  /** Password typed on this page; lives only in component state, never stored. */
   password: string;
   onPasswordChange: (password: string) => void;
   onClose: () => void;
 }
 
 /**
- * Asks for the login password and builds the full command URL with it while
- * the user types. The password stays in memory only: it is not sent to the
- * gateway, not written to any storage and gone when the guide closes.
+ * Asks for the login password and builds the URL with it while the user
+ * types. The password stays in memory only: it is not sent to the gateway,
+ * not written to any storage and gone when the page closes.
  */
-export function FullUrlPanel({ url, gatewayPort, authUser, password, onPasswordChange, onClose }: FullUrlPanelProps) {
+export function CredentialUrlPanel({ buildUrl, authUser, password, onPasswordChange, onClose }: CredentialUrlPanelProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -29,7 +28,7 @@ export function FullUrlPanel({ url, gatewayPort, authUser, password, onPasswordC
     return () => clearTimeout(timer);
   }, [copied]);
 
-  const fullUrl = buildExternalUrl(url, { gatewayPort, authUser, authPassword: password });
+  const fullUrl = buildUrl(password);
   // The preview masks the password unless the user asks to see it.
   const previewUrl = showPassword || !password
     ? fullUrl

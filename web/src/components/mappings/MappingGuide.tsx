@@ -4,7 +4,7 @@ import type { Mapping } from '../../types';
 import { CopyButton } from '../CopyButton';
 import { Tooltip } from '../Tooltip';
 import { buildExternalUrl, getLoxoneGuide, getTestUrls } from '../../utils/loxoneGuide';
-import { FullUrlPanel } from './FullUrlPanel';
+import { CredentialUrlPanel } from '../CredentialUrlPanel';
 import type { MappingEnv } from './env';
 
 interface MappingGuideProps {
@@ -101,9 +101,8 @@ export function MappingGuide({ mapping, env }: MappingGuideProps) {
                 </div>
                 <code className="block text-sm text-green-400 font-mono break-all">{test.url}</code>
                 {env.authUser && passwordFor === test.url && (
-                  <FullUrlPanel
-                    url={test.url}
-                    gatewayPort={env.gatewayPort}
+                  <CredentialUrlPanel
+                    buildUrl={(pw) => buildExternalUrl(test.url, { gatewayPort: env.gatewayPort, authUser: env.authUser, authPassword: pw })}
                     authUser={env.authUser}
                     password={password}
                     onPasswordChange={setPassword}
