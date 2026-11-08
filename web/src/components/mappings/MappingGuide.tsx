@@ -2,7 +2,7 @@ import { ExternalLink, Link2, Terminal } from 'lucide-react';
 import type { Mapping } from '../../types';
 import { CopyButton } from '../CopyButton';
 import { Tooltip } from '../Tooltip';
-import { buildExternalUrl, getLoxoneGuide, getTestUrls } from '../../utils/loxoneGuide';
+import { buildExternalUrl, getLoxoneGuide, getTestUrls, PASSWORD_PLACEHOLDER } from '../../utils/loxoneGuide';
 import type { MappingEnv } from './env';
 
 interface MappingGuideProps {
@@ -59,9 +59,11 @@ export function MappingGuide({ mapping, env }: MappingGuideProps) {
                   <div className="flex gap-2">
                     <CopyButton text={test.url} />
                     <CopyButton
-                      text={buildExternalUrl(test.url, env.gatewayPort)}
+                      text={buildExternalUrl(test.url, { gatewayPort: env.gatewayPort, authUser: env.authUser })}
                       label="Volle URL"
-                      tooltip="Vollständige URL für externen Client kopieren (direkt auf Gateway-Port)"
+                      tooltip={env.authUser
+                        ? `Vollständige URL mit Zugangsdaten kopieren (${PASSWORD_PLACEHOLDER} durch das Passwort ersetzen)`
+                        : 'Vollständige URL für externen Client kopieren (direkt auf Gateway-Port)'}
                       icon={<Link2 size={12} />}
                     />
                     <Tooltip content="Im Browser testen" position="top">

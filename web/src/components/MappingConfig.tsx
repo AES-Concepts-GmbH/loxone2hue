@@ -26,6 +26,7 @@ export function MappingConfig({ lights, groups, scenes, sensors = [], onNavigate
   const [loading, setLoading] = useState(true);
   const [miniservers, setMiniservers] = useState<api.MiniserverConfig[]>([]);
   const [gatewayPort, setGatewayPort] = useState<number | undefined>();
+  const [authUser, setAuthUser] = useState<string | undefined>();
   const [wizardOpen, setWizardOpen] = useState(false);
   const [importFile, setImportFile] = useState<api.MappingsBackup | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -40,6 +41,7 @@ export function MappingConfig({ lights, groups, scenes, sensors = [], onNavigate
     hasUDP: miniservers.some((ms) => ms.udp_enabled),
     hasHTTP: miniservers.some((ms) => ms.http_enabled),
     gatewayPort,
+    authUser,
   };
 
   const loadMappings = useCallback(async () => {
@@ -59,6 +61,7 @@ export function MappingConfig({ lights, groups, scenes, sensors = [], onNavigate
       .then((cfg) => {
         setMiniservers(cfg.loxone?.miniservers || []);
         setGatewayPort(cfg.server?.port);
+        setAuthUser(cfg.auth?.enabled ? cfg.auth.username || 'admin' : undefined);
       })
       .catch(() => {});
   }, [loadMappings]);
